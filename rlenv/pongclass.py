@@ -17,9 +17,9 @@ class pongGame:
             pygame.init()
             self.window = pygame.display.set_mode((self.h, self.w))
 
-        self.reset()
+        self.reset()  # self.last_action = np.finfo(np.float32).eps.item()
 
-    def reset(self):
+    def reset_ball(self):
         # ball x and y location
         self.xball = self.w / 2
         self.yball = self.h / 2
@@ -28,6 +28,10 @@ class pongGame:
         self.totalSpeed = 2
         self.ballHDirection = self.totalSpeed * math.cos(self.angle)
         self.ballVDirection = self.totalSpeed * math.sin(self.angle)
+
+    def reset(self):
+        self.reset_ball()
+        # self.last_action = np.finfo(np.float32).eps.item()
         # player paddle location
         self.y1 = self.h / 2 - 40
         # computer paddle location
@@ -37,16 +41,8 @@ class pongGame:
 
     # returns all the parameters for the game (player location, computer location, x of ball, y of ball, x direction of ball, y direction of ball)
     def getState(self):
-        return np.array(
-            [
-                self.y1,
-                self.y2,
-                self.xball,
-                self.yball,
-                self.ballHDirection,
-                self.ballVDirection,
-            ]
-        )
+        return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
+                        dtype=np.float32)
 
     # Take one step of the game
     def takeAction(self, action):
@@ -65,30 +61,16 @@ class pongGame:
             self.y2 = self.y2 - 5
 
         # math for when paddle hits ball
-        if (
-            self.yball > self.y1
-            and self.yball < self.y1 + self.paddle_length
-            and self.xball > 0
-            and self.xball < 15
-        ):
+        if (self.yball > self.y1 and self.yball < self.y1 + self.paddle_length and self.xball > 0 and self.xball < 15):
             self.totalSpeed = self.totalSpeed + 0.2
-            self.angle = (
-                (math.pi / 4)
-                * (self.yball - (self.y1 + self.paddle_length / 2))
-                / (self.paddle_length / 2)
-            )
+            self.angle = ((math.pi / 4) * (self.yball - (self.y1 + self.paddle_length / 2)) / (self.paddle_length / 2))
             self.xball = 15
             r = 1
         elif (
-            self.yball > self.y2
-            and self.yball < self.y2 + self.paddle_length
-            and self.xball > self.w - 15
-            and self.xball < self.w
-        ):
+                self.yball > self.y2 and self.yball < self.y2 + self.paddle_length and self.xball > self.w - 15 and self.xball < self.w):
             self.totalSpeed = self.totalSpeed + 0.2
-            self.angle = math.pi - (math.pi / 4) * (
-                self.yball - (self.y2 + self.paddle_length / 2)
-            ) / (self.paddle_length / 2)
+            self.angle = math.pi - (math.pi / 4) * (self.yball - (self.y2 + self.paddle_length / 2)) / (
+                    self.paddle_length / 2)
             self.xball = self.w - 15
 
         # if you lose
@@ -106,7 +88,7 @@ class pongGame:
         self.ballVDirection = self.totalSpeed * math.sin(self.angle)
         self.xball = self.xball + self.ballHDirection
         self.yball = self.yball + self.ballVDirection
-
+        # self.last_action = action
         # return reward
         return r
 
@@ -116,12 +98,8 @@ class pongGame:
         self.window.fill(0)
 
         # draw the scene
-        pygame.draw.rect(
-            self.window, (255, 255, 255), (5, self.y1, 10, self.paddle_length)
-        )
-        pygame.draw.rect(
-            self.window, (255, 255, 255), (self.w - 15, self.y2, 10, self.paddle_length)
-        )
+        pygame.draw.rect(self.window, (255, 255, 255), (5, self.y1, 10, self.paddle_length))
+        pygame.draw.rect(self.window, (255, 255, 255), (self.w - 15, self.y2, 10, self.paddle_length))
         pygame.draw.circle(self.window, (255, 255, 255), (self.xball, self.yball), 5)
         # update the display
         pygame.display.flip()

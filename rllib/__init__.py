@@ -1,4 +1,4 @@
-__all__ = ["QLearningAgent", "Utils"]
+__all__ = ["QLearningAgent"]
 
 from .agent import QLearningAgent
-from .utils import Utils
+from .utils import *
