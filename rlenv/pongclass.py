@@ -41,8 +41,10 @@ class pongGame:
 
     # returns all the parameters for the game (player location, computer location, x of ball, y of ball, x direction of ball, y direction of ball)
     def getState(self):
-        return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
-                        dtype=np.float32)
+        # return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
+        #                 dtype=np.float32)
+
+        return np.array([self.y1, self.xball, self.yball], dtype=np.float32)
 
     # Take one step of the game
     def takeAction(self, action):

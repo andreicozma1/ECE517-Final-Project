@@ -61,24 +61,24 @@ class Models:
         inputs = keras.layers.Input(shape=(self.e_num_states,), name="input")
 
         # Dense
-        l1 = keras.layers.Dense(4096, activation="relu")
-        l2 = keras.layers.Dropout(0.2)
+        l1 = keras.layers.Dense(2048, activation="relu")
+        l2 = keras.layers.Dropout(0.01)
         l3 = keras.layers.Dense(2048, activation="relu")
-        l4 = keras.layers.Dropout(0.2)
-        l5 = keras.layers.Dense(1024, activation="relu")
-        l6 = keras.layers.Dropout(0.2)
+        l4 = keras.layers.Dropout(0.01)
+        # l5 = keras.layers.Dense(1024, activation="relu")
+        # l6 = keras.layers.Dropout(0.01)
 
         common = l1(inputs)
         common = l2(common)
         common = l3(common)
         common = l4(common)
-        common = l5(common)
-        common = l6(common)
+        # common = l5(common)
+        # common = l6(common)
 
         ac_layer = ActorCriticLayer(self.e_num_actions)(actor_inputs=common, critic_inputs=common)
 
         model = keras.Model(inputs=inputs, outputs=ac_layer, name="m_dense")
-        optimizer = keras.optimizers.Adam(learning_rate=0.001)
+        optimizer = keras.optimizers.Adam(learning_rate=0.0001)
         # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
         # optimizer = tfa.optimizers.AdamW(
         #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
@@ -256,15 +256,16 @@ class Experiment:
         # reset the scale heuristics
         if reset_scale_heuristics:
             log.warning("Resetting scale heuristics.")
-            self._e_state_min = np.ones(self.e_num_states) * np.inf
-            self._e_state_max = np.ones(self.e_num_states) * -np.inf
+            self._e_state_min = np.zeros_like(self.e_num_states, dtype=np.float32)
+            self._e_state_max = np.zeros_like(self.e_num_states, dtype=np.float32)
             log.info("Getting min/max values for state normalization.")
             actions = np.arange(self.e_num_actions)
             for a in actions:
-                self._env.reset()
                 for _ in range(5000):
-                    self._env.takeAction(a)
                     self.env_get_state()
+                    rew = self._env.takeAction(a)
+                    if rew is [-100, 100]:
+                        self.env_reset()
 
             log.info(f"State min: {self._e_state_min}")
             log.info(f"State max: {self._e_state_max}")
@@ -273,7 +274,7 @@ class Experiment:
         # self.game.reset_ball()
         self._env.reset()
         # clear the state history
-        self._e_state_hist = np.zeros(shape=(1, self.e_state_timesteps, self.e_num_states))
+        self._e_state_hist = np.zeros(shape=(1, self.e_state_timesteps, self.e_num_states), dtype=np.float32)
         return self.env_get_state()
 
     def env_get_state(self):
@@ -281,13 +282,14 @@ class Experiment:
         if self._e_state_min is None or self._e_state_max is None:
             log.warning("State min/max not initialized.")
         # get min and max values for normalization
-        self._e_state_min = np.minimum(self._e_state_min, state)
-        self._e_state_max = np.maximum(self._e_state_max, state)
+        self._e_state_min = np.minimum(self._e_state_min, state, dtype=np.float32)
+        self._e_state_max = np.maximum(self._e_state_max, state, dtype=np.float32)
         # scale between 0 and 1
         state = (state - self._e_state_min) / (self._e_state_max - self._e_state_min)
         # scale between -1 and 1
-        state = state * 2 - 1
+        # state = state * 2 - 1
         state = state[np.newaxis, :]
+        # print(state)
         return tf.convert_to_tensor(state, dtype=tf.float32)
 
     def run_experiment(self,
@@ -312,6 +314,7 @@ class Experiment:
         running_reward = 0
 
         for curr_episode in range(max_episodes):
+            print("=" * 80)
             with tf.GradientTape() as tape:
                 rewards_hist, action_probs_hist, critic_value_hist = self.run_episode(training,
                                                                                       max_steps=max_steps,
@@ -379,7 +382,6 @@ class Experiment:
 
             state = self.env_get_state()
 
-        print("=" * 80)
         if episode_num is not None:
             log.info(f"#{episode_num:>5}: Steps {step:<4} | Reward {total_reward}")
         else:
