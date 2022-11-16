@@ -62,14 +62,18 @@ class Models:
 
         # Dense
         l1 = keras.layers.Dense(4096, activation="relu")
-        l2 = keras.layers.Dense(2048, activation="relu")
-        l3 = keras.layers.Dense(1024, activation="relu")
+        l2 = keras.layers.Dropout(0.2)
+        l3 = keras.layers.Dense(2048, activation="relu")
         l4 = keras.layers.Dropout(0.2)
+        l5 = keras.layers.Dense(1024, activation="relu")
+        l6 = keras.layers.Dropout(0.2)
 
         common = l1(inputs)
         common = l2(common)
         common = l3(common)
         common = l4(common)
+        common = l5(common)
+        common = l6(common)
 
         ac_layer = ActorCriticLayer(self.e_num_actions)(actor_inputs=common, critic_inputs=common)
 
@@ -321,11 +325,14 @@ class Experiment:
                 if training:
                     self.update(tape, action_probs_hist, critic_value_hist, rewards_hist)
 
-    def run_episode(self,
-                    training: bool,
-                    max_steps: int = 50000,
-                    draw_speed: float | None = None,
-                    episode_num: int = None):
+            if curr_episode != 0 and curr_episode % 10 == 0:
+                for i in range(10):
+                    self.run_episode(training=False,
+                                     max_steps=max_steps,
+                                     draw_speed=draw_speed,
+                                     episode_num=f"{curr_episode}_{i}")
+
+    def run_episode(self, training: bool, max_steps: int = 50000, draw_speed: float | None = None, episode_num=None):
         """
         Runs a single episode
         :param training: If False, the agent will pick the action with the highest probability.
@@ -355,7 +362,11 @@ class Experiment:
             # print(f"A: {action_probs} (shape: {action_probs.shape})", end="\t")
             # print(f"C: {critic_value} (shape: {critic_value.shape})")
 
-            action = np.random.choice(self.e_num_actions, p=action_probs.numpy())
+            if training:
+                action = np.random.choice(self.e_num_actions, p=action_probs.numpy())
+            else:
+                action = np.argmax(action_probs)
+
             action_probs_hist.append(tf.math.log(action_probs[action]))
             critic_value_hist.append(critic_value)
 
@@ -377,7 +388,7 @@ class Experiment:
 
     def update(self, tape, tr_action_probs_hist, tr_critic_value_hist, tr_rewards_hist):
         # For stateful model
-        self._model.reset_states()
+        # self._model.reset_states()
 
         # Calculate expected value from rewards
         # - At each timestep what was the total reward received after that timestep
