@@ -1,241 +1,63 @@
+import hashlib
+import json
 import logging
+import os
 import pprint
-import time
 
 import numpy as np
 import tensorflow as tf
-import tensorflow_addons as tfa
 
+import wandb
+from Models import Models
 from rlenv.pongclass import pongGame
 # This is a hacky fix for tensorflow imports to work with intellisense
 from rllib.utils import logging_setup
 
-keras = tf.keras
-
 # Logging to stdout and file with logging class
 
-log = logging_setup(file=__file__, name=__name__, level=logging.DEBUG)
-
-
-class TransformerBlock(keras.layers.Layer):
-    def __init__(self, embed_dim, num_heads, ff_dim, dropout_rate=0.1):
-        super(TransformerBlock, self).__init__()
-        self.att = tfa.layers.MultiHeadAttention(head_size=embed_dim, num_heads=num_heads)
-        self.ffn = keras.Sequential([*[keras.layers.Dense(ffd, activation="relu") for ffd in ff_dim],
-                                     keras.layers.Dense(embed_dim), ])
-        self.layernorm1 = keras.layers.LayerNormalization(epsilon=1e-6)
-        self.layernorm2 = keras.layers.LayerNormalization(epsilon=1e-6)
-        self.dropout1 = keras.layers.Dropout(dropout_rate)
-        self.dropout2 = keras.layers.Dropout(dropout_rate)
-
-    def call(self, inputs, training, mask=None):
-        attn_output = self.att(inputs, inputs, attention_mask=mask)
-        attn_output = self.dropout1(attn_output, training=training)
-        out1 = self.layernorm1(inputs + attn_output)
-        ffn_output = self.ffn(out1)
-        ffn_output = self.dropout2(ffn_output, training=training)
-        return self.layernorm2(out1 + ffn_output)
-
-
-class ActorCriticLayer(keras.layers.Layer):
-    def __init__(self, num_actions):
-        super(ActorCriticLayer, self).__init__()
-        self.o_a = keras.layers.Dense(num_actions, activation="softmax", name="actor")
-        self.o_c = keras.layers.Dense(1, activation="linear", name="critic")
-
-    def call(self, actor_inputs, critic_inputs):
-        actor = self.o_a(actor_inputs)
-        critic = self.o_c(critic_inputs)
-        return [actor, critic]
-
-
-class Models:
-    def __init__(self, e_num_states, e_num_actions):
-        self.e_num_states = e_num_states
-        self.e_num_actions = e_num_actions
-        log.info(f"Models Args: {pprint.pformat(self.__dict__)}")
-
-    def m_dense(self, **kwargs):
-        logging.info("Model: m_dense")
-        logging.info(f"kwargs: {pprint.pformat(kwargs)}")
-        inputs = keras.layers.Input(shape=(self.e_num_states,), name="input")
-
-        # Dense
-        l1 = keras.layers.Dense(2048, activation="relu")
-        l2 = keras.layers.Dropout(0.01)
-        l3 = keras.layers.Dense(2048, activation="relu")
-        l4 = keras.layers.Dropout(0.01)
-        # l5 = keras.layers.Dense(1024, activation="relu")
-        # l6 = keras.layers.Dropout(0.01)
-
-        common = l1(inputs)
-        common = l2(common)
-        common = l3(common)
-        common = l4(common)
-        # common = l5(common)
-        # common = l6(common)
-
-        ac_layer = ActorCriticLayer(self.e_num_actions)(actor_inputs=common, critic_inputs=common)
-
-        model = keras.Model(inputs=inputs, outputs=ac_layer, name="m_dense")
-        optimizer = keras.optimizers.Adam(learning_rate=0.0001)
-        # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
-        # optimizer = tfa.optimizers.AdamW(
-        #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
-        # )
-        huber_loss = keras.losses.Huber()
-
-        return model, optimizer, huber_loss
-
-    def m_rnn(self, **kwargs):
-        log.info("Model: m_rnn")
-        log.info(f"kwargs: {pprint.pformat(kwargs)}")
-        inputs = keras.layers.Input(shape=(self.e_num_states,))
-
-        # RNN
-        common = keras.layers.Reshape((1, self.e_num_states))(inputs)
-        common = keras.layers.SimpleRNN(256, return_sequences=True)(common)
-        common = keras.layers.Dropout(0.2)(common)
-        common = keras.layers.SimpleRNN(256, return_sequences=False)(common)
-        common = keras.layers.Dropout(0.2)(common)
-
-        actor = keras.layers.Dense(self.e_num_actions, activation="softmax")(common)
-        critic = keras.layers.Dense(1)(common)
-
-        model = keras.Model(inputs=inputs, outputs=[actor, critic], name="m_rnn")
-        optimizer = keras.optimizers.Adam(learning_rate=0.001)
-        # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
-        # optimizer = tfa.optimizers.AdamW(
-        #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
-        # )
-        huber_loss = keras.losses.Huber()
-
-        return model, optimizer, huber_loss
-
-    def m_lstm(self, **kwargs):
-        log.info("Model: m_lstm")
-        log.info(f"kwargs: {pprint.pformat(kwargs)}")
-        inputs = keras.layers.Input(shape=(self.e_num_states,))
-
-        # LSTM
-        common = keras.layers.Reshape((1, self.e_num_states))(inputs)
-        common = keras.layers.LSTM(256, return_sequences=True)(common)
-        common = keras.layers.Dropout(0.2)(common)
-        common = keras.layers.LSTM(256, return_sequences=False)(common)
-        common = keras.layers.Dropout(0.2)(common)
-
-        actor = keras.layers.Dense(self.e_num_actions, activation="softmax", )(common)
-        critic = keras.layers.Dense(1)(common)
-
-        model = keras.Model(inputs=inputs, outputs=[actor, critic], name="m_lstm")
-        optimizer = keras.optimizers.Adam(learning_rate=0.001)
-        # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
-        # optimizer = tfa.optimizers.AdamW(
-        #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
-        # )
-        huber_loss = keras.losses.Huber()
-
-        return model, optimizer, huber_loss
-
-    def m_attention(self, **kwargs):
-        log.info("Model: m_attention")
-        log.info(f"kwargs: {pprint.pformat(kwargs)}")
-        # The current state of the environment
-        inputs = keras.layers.Input(  # shape=(
-                #     None,
-                #     self.n_inputs,
-                # ),
-                batch_input_shape=(1, 30, self.e_num_states), )
-
-        common = keras.layers.LSTM(128, return_sequences=True, stateful=False)(inputs)
-        common = keras.layers.Dropout(0.2)(common)
-
-        # LSTM Actor
-        lstm_actor = keras.layers.LSTM(128, return_sequences=False)(common)
-        lstm_actor = keras.layers.Dropout(0.5)(lstm_actor)
-        # LSTM Critic
-        lstm_critic = keras.layers.LSTM(128, return_sequences=False)(common)
-        lstm_critic = keras.layers.Dropout(0.5)(lstm_critic)
-
-        # # Dense Actor
-        dense_actor = keras.layers.Dense(128, activation="relu")(inputs)
-        dense_actor = keras.layers.Dropout(0.2)(dense_actor)
-
-        # Dense Critic
-        dense_critic = keras.layers.Dense(128, activation="relu")(inputs)
-        dense_critic = keras.layers.Dropout(0.2)(dense_critic)
-
-        # Merge
-        att_a = keras.layers.MultiHeadAttention(num_heads=6, key_dim=64, dropout=0.2)(dense_critic, dense_actor)
-        att_a = keras.layers.Dropout(0.2)(common)
-
-        att_c = keras.layers.MultiHeadAttention(num_heads=6, key_dim=64, dropout=0.2)(dense_critic, dense_critic)
-        att_c = keras.layers.Dropout(0.2)(common)
-
-        # Multiply the actor by the attention of the critic
-        att_a = keras.layers.Multiply()([dense_actor, att_a])
-        att_a = keras.layers.Dropout(0.2)(att_a)
-
-        # Multiply the critic by the attention of the actor
-        att_c = keras.layers.Multiply()([dense_critic, att_c])
-        att_c = keras.layers.Dropout(0.2)(att_c)
-
-        # Flatten
-        actor = keras.layers.Flatten()(att_a)
-        critic = keras.layers.Flatten()(att_c)
-
-        # Output
-        action = keras.layers.Dense(self.e_num_actions, activation="softmax")(actor)
-        critic = keras.layers.Dense(1)(critic)
-
-        model = keras.Model(inputs=inputs, outputs=[action, critic])
-        optimizer = keras.optimizers.Adam(learning_rate=0.001)
-        # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
-        # optimizer = tfa.optimizers.AdamW(
-        #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
-        # )
-        huber_loss = keras.losses.Huber()
-
-        return model, optimizer, huber_loss
+log = logging_setup(file=__file__, name=__name__, level=logging.INFO)
 
 
 class Experiment:
     def __init__(self,
-                 gamma=0.95,
-                 epsilon=np.finfo(np.float32).eps.item(),
+                 gamma=0.75,
+                 learning_rate=0.001,
                  state_timesteps=30,
                  state_num_prev_actions=1,
-                 env_draw=False):
+                 env_draw=False,
+                 env_draw_speed=None):
         """
         Constructs an experiment.
         Args:
             gamma (float, optional): RL agent discount factor. Defaults to 0.95.
-            epsilon (_type_, optional): RL agent epsilon. Defaults to np.finfo(np.float32).eps.item().
             state_timesteps (int, optional): The number of previous time steps to include in the state. Defaults to 30.
             state_num_prev_actions (int, optional): number of previous actions to append to the environment state. Defaults to 1.
             env_draw (bool, optional): whether to draw the environment. Defaults to False.
         """
         log.info("Experiment:")
         # Agent parameters
-        self.a_model_func = None
         self._model, self._optimizer, self._loss = None, None, None
-        self.a_gamma, self.a_epsilon = gamma, epsilon
+        self.a_gamma, self.a_learning_rate = gamma, learning_rate
 
         # Environment parameters
         self.e_state_timesteps = state_timesteps
         self.e_state_num_prev_actions = state_num_prev_actions
-        self.e_draw = env_draw
-        self._env = pongGame(400, 400, draw=self.e_draw)
+        self._env = pongGame(300, 300, draw=env_draw, draw_speed=env_draw_speed)
+
         self.e_num_states = self._env.getState().shape[0]
         self.e_num_actions = 3
 
         # Other parameters for the experiment
         self._e_state_hist, self._e_state_min, self._e_state_max = None, None, None
         # Initialize the environment
-        self.state_shape = self.env_reset(reset_scale_heuristics=True).shape
+        self.e_state_shape = str(self.env_reset(reset_scale_heuristics=True).shape)
 
         # Wandb
-        self._config = {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+        self._config = {}
+        self.update_config()
+
+    def update_config(self):
+        self._config.update({k: v for k, v in self.__dict__.items() if not k.startswith("_")})
 
     def init_model(self, model_func_name: str, **kwargs):
         """
@@ -244,12 +66,22 @@ class Experiment:
             model_func_name (str): corresponding function name in Models class (as string)
             **kwargs: Keyword arguments passed to the model function
         """
-        self.a_model_func = model_func_name
-        models = Models(self.e_num_states, self.e_num_actions, )
+        models = Models(self.e_num_states, self.e_num_actions, learning_rate=self.a_learning_rate)
         init_model = getattr(models, model_func_name)
         self._model, self._optimizer, self._loss = init_model(**kwargs)
+        model_config = self._model.get_config()
+        model_config_hash = hashlib.md5(json.dumps(model_config).encode('utf-8')).hexdigest()
         self._model.summary()
-        self._config.update(kwargs)
+        self._config.update({
+                "model": {
+                        "func_name"  : model_func_name,
+                        "kwargs"     : kwargs,
+                        "num_layers" : len(self._model.layers),
+                        "num_params" : self._model.count_params(),
+                        "config"     : model_config,
+                        "config_hash": model_config_hash
+                }
+        })
 
     def env_reset(self, reset_scale_heuristics=False):
 
@@ -259,12 +91,17 @@ class Experiment:
             self._e_state_min = np.zeros_like(self.e_num_states, dtype=np.float32)
             self._e_state_max = np.zeros_like(self.e_num_states, dtype=np.float32)
             log.info("Getting min/max values for state normalization.")
+            for _ in range(2000):
+                self.env_get_state()
+                rew = self._env.takeAction(2, ai_p1=True)
+                if rew in [-100, 100]:
+                    self.env_reset()
             actions = np.arange(self.e_num_actions)
             for a in actions:
-                for _ in range(5000):
+                for _ in range(2000):
                     self.env_get_state()
                     rew = self._env.takeAction(a)
-                    if rew is [-100, 100]:
+                    if rew in [-100, 100]:
                         self.env_reset()
 
             log.info(f"State min: {self._e_state_min}")
@@ -294,48 +131,90 @@ class Experiment:
 
     def run_experiment(self,
                        training: bool,
-                       max_episodes: int = 10000,
-                       max_steps: int = 50000,
-                       draw_speed: float | None = None):
+                       max_episodes: int = 500,
+                       max_steps: int = 10000,
+                       test_every: int = None,
+                       test_for: int = 10):
         """
         Runs experiments
         Args:
             training (bool, optional): Whether to train the agent. Defaults to True.
             max_episodes (int, optional): Maximum number of episodes. Defaults to 10000.
             max_steps (int, optional): Maximum number of steps per episode. Defaults to 50000.
+            test_every (int, optional): Number of episodes between tests. Defaults to 50.
+            test_for (int, optional): Number of episodes to test for. Defaults to 10.
             draw_speed (float | None, optional): Caps the draw speed of the game. Defaults to None.(as fast as possible)
         """
-        if self.a_model_func is None or self._model is None or self._optimizer is None or self._loss is None:
+        self.update_config()
+        log.info(f"Config:\n{pprint.pformat(self._config)}")
+        if self._model is None or self._optimizer is None or self._loss is None:
             raise ValueError("Model not initialized. You must call initModel() before running an experiment.")
 
-        log.info(f"Config:\n{pprint.pformat(self._config)}")
-        # wandb.init(project="ECE517", entity="utkteam")
+        hash_all = hashlib.md5(json.dumps(self._config).encode('utf-8')).hexdigest()
+        model_hash = self._config["model"]["config_hash"]
+        wandb.init(project="ECE517",
+                   entity="utkteam",
+                   name=hash_all,
+                   group=self._config["model"]["func_name"],
+                   job_type="train" if training else "test",
+                   tags=[f"Opt:{self._optimizer.__class__.__name__}", f"Loss:{self._loss.__class__.__name__}",
+                         model_hash],
+                   config=self._config)
+        model_img_filename = f"{model_hash}.png"
+        tf.keras.utils.plot_model(self._model,
+                                  to_file=model_img_filename,
+                                  show_layer_names=True,
+                                  show_shapes=True,
+                                  show_dtype=True,
+                                  expand_nested=True,
+                                  show_layer_activations=True,
+                                  dpi=120)
+        wandb.log({
+                "model": wandb.Image(model_img_filename)
+        })
+        os.remove(model_img_filename)
 
-        running_reward = 0
+        metrics = {
+                "running_total": 0,
+                "running_avg"  : 0
+        }
 
         for curr_episode in range(max_episodes):
             print("=" * 80)
             with tf.GradientTape() as tape:
-                rewards_hist, action_probs_hist, critic_value_hist = self.run_episode(training,
-                                                                                      max_steps=max_steps,
-                                                                                      draw_speed=draw_speed,
-                                                                                      episode_num=curr_episode)
+                rewards_hist, action_probs_hist, critic_value_hist = self.run_episode(training, max_steps=max_steps)
 
-                # Update running reward
-                running_reward = 0.05 * rewards_hist[-1] + (1 - 0.05) * running_reward
-                logging.info(f"Running Reward: {round(running_reward, 2)}")
+                metrics.update({
+                        "episode"     : curr_episode,
+                        "steps"       : len(rewards_hist),
+                        "total_reward": np.sum(rewards_hist),
+                        "avg_reward"  : np.mean(rewards_hist),
+                        "max_reward"  : np.max(rewards_hist),
+                        "min_reward"  : np.min(rewards_hist),
+                })
+
+                metrics.update({
+                        "running_total": 0.05 * metrics["total_reward"] + 0.95 * metrics["running_total"],
+                        "running_avg"  : 0.05 * metrics["avg_reward"] + 0.95 * metrics["running_avg"],
+                })
+
+                log.info(f"#{curr_episode:>5}: Steps {metrics['steps']} | "
+                         f"Total Reward {metrics['total_reward']} | "
+                         f"Avg Reward {metrics['avg_reward']} | "
+                         f"Running Total {metrics['running_total']} | "
+                         f"Running Avg {metrics['running_avg']}")
 
                 if training:
-                    self.update(tape, action_probs_hist, critic_value_hist, rewards_hist)
+                    tr_metrics = self.update(tape, action_probs_hist, critic_value_hist, rewards_hist)
+                    metrics.update(tr_metrics)
 
-            if curr_episode != 0 and curr_episode % 10 == 0:
-                for i in range(10):
-                    self.run_episode(training=False,
-                                     max_steps=max_steps,
-                                     draw_speed=draw_speed,
-                                     episode_num=f"{curr_episode}_{i}")
+                wandb.log(metrics)
 
-    def run_episode(self, training: bool, max_steps: int = 50000, draw_speed: float | None = None, episode_num=None):
+            if test_every is not None and curr_episode != 0 and curr_episode % test_every == 0:
+                for _ in range(test_for):
+                    self.run_episode(training=False, max_steps=max_steps)
+
+    def run_episode(self, training: bool, max_steps: int = 50000):
         """
         Runs a single episode
         :param training: If False, the agent will pick the action with the highest probability.
@@ -346,12 +225,9 @@ class Experiment:
         :return:
         """
         reward_hist, action_probs_hist, critic_value_hist = [], [], []
-        state, total_reward, step = self.env_reset(reset_scale_heuristics=False), 0, 0
+        state = self.env_reset(reset_scale_heuristics=False)
 
-        for step in range(max_steps):
-            if self.e_draw:
-                self.env_draw(draw_speed)
-
+        for _ in range(max_steps):
             # Predict action probabilities and estimated future rewards from environment state
             action_probs, critic_value = self._model(state)
             action_probs, critic_value = tf.squeeze(action_probs), tf.squeeze(critic_value)
@@ -376,19 +252,14 @@ class Experiment:
             # Reward
             reward = self._env.takeAction(action)
             reward_hist.append(reward)
-            total_reward += reward
             if reward in [-100, 100]:
                 break
 
             state = self.env_get_state()
 
-        if episode_num is not None:
-            log.info(f"#{episode_num:>5}: Steps {step:<4} | Reward {total_reward}")
-        else:
-            log.info(f"Steps {step:<4} | Reward {total_reward}")
         return reward_hist, action_probs_hist, critic_value_hist
 
-    def update(self, tape, tr_action_probs_hist, tr_critic_value_hist, tr_rewards_hist):
+    def update(self, tape, action_probs_hist, critic_value_hist, rewards_hist):
         # For stateful model
         # self._model.reset_states()
 
@@ -398,15 +269,19 @@ class Experiment:
         # - These are the labels for our critic
         returns = []
         discounted_sum = 0
-        for r in tr_rewards_hist[::-1]:
+        for r in rewards_hist[::-1]:
             discounted_sum = r + self.a_gamma * discounted_sum
             returns.insert(0, discounted_sum)
+
+        print("+" * 80)
+        print(f"Discounted Sum: {discounted_sum}")
         # Normalize the returns
         returns = np.array(returns)
-        returns = (returns - np.mean(returns)) / (np.std(returns) + self.a_epsilon)
+        returns = (returns - np.mean(returns)) / (np.std(returns) + 1e-7)
         returns = returns.tolist()
+
         # Calculating loss values to update our network
-        history = zip(tr_action_probs_hist, tr_critic_value_hist, returns)
+        history = zip(action_probs_hist, critic_value_hist, returns)
         actor_losses, critic_losses = [], []
         for log_prob, value, ret in history:
             # At this point in history, the critic estimated that we would get a
@@ -426,23 +301,37 @@ class Experiment:
         grads = tape.gradient(loss_value, self._model.trainable_variables)
         self._optimizer.apply_gradients(zip(grads, self._model.trainable_variables))
 
-        # Logging
-        actor_loss_mean, actor_loss_std = np.mean(actor_losses), np.std(actor_losses)
-        critic_loss_mean, critic_loss_std = np.mean(critic_losses), np.std(critic_losses)
-        print(f"UPDATE: Loss: {tf.round(loss_value, 2):<6}", end="\t")
-        print(f"[ A: {tf.round(actor_loss_mean, 2):<3} +/- {tf.round(actor_loss_std, 2):<3} | "
-              f"C: {tf.round(critic_loss_mean, 2):<3} +/- {tf.round(critic_loss_std, 2):<3} ]")
-
-    def env_draw(self, draw_speed: float | None = None):
-        self._env.draw()
-        if draw_speed is not None:
-            time.sleep(draw_speed)
+        tr_metrics = {
+                "discounted_sum": discounted_sum,
+                "loss_actor"    : sum(actor_losses),
+                "loss_critic"   : sum(critic_losses),
+                "loss"          : loss_value,
+        }
+        return tr_metrics
 
 
 def main():
-    exp = Experiment(env_draw=True)
+    exp = Experiment(env_draw=False)
     exp.init_model("m_dense")
     exp.run_experiment(training=True)
+
+    # Run 10 experiments for each of the following parameters
+    # Learning rate: 0.00001, 0.0001, 0.001, 0.01
+    # Gamma 0.999, 0.99, 0.9, 0.8, 0.7
+
+    # learning_rates = [0.0001, 0.001, 0.01]
+    # gammas = [0.999, 0.99, 0.9, 0.8, 0.7]
+    #
+    # # create all combinations of the parameters
+    # params = list(itertools.product(learning_rates, gammas))
+    #
+    # # run 10 experiments for each combination
+    # for i in range(10):
+    #     for lr, gamma in params:
+    #         print(f"Experiment {i + 1} of 10: lr={lr}, gamma={gamma}")
+    #         exp = Experiment(env_draw=False, learning_rate=lr, gamma=gamma)
+    #         exp.init_model("m_dense")
+    #         exp.run_experiment(training=True)
 
 
 if __name__ == "__main__":
