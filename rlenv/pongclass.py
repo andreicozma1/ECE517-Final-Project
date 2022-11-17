@@ -18,7 +18,7 @@ class pongGame:
         self.should_draw = draw
         self.draw_speed = draw_speed
         self.reset()
-        # self.last_action = np.finfo(np.float32).eps.item()
+        self.last_action = 2
         if self.should_draw:
             pygame.init()
             self.window = pygame.display.set_mode((self.h, self.w))
@@ -46,13 +46,19 @@ class pongGame:
 
     # returns all the parameters for the game (player location, computer location, x of ball, y of ball, x direction of ball, y direction of ball)
     def getState(self):
+        # return np.array([self.y1, self.xball, self.yball],
+        #                 dtype=np.float32)
         # return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
         #                 dtype=np.float32)
+        return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection,
+                         self.last_action],
+                        dtype=np.float32)
 
-        return np.array([self.y1, self.xball, self.yball], dtype=np.float32)
+        # return np.array([self.y1, self.xball, self.yball], dtype=np.float32)
 
     # Take one step of the game
     def takeAction(self, action, ai_p1=False, ai_p2=True):
+        self.last_action = action
         # reward
         r = 0
         # move action (up is 0, down is 1, no move is 2)
@@ -73,7 +79,7 @@ class pongGame:
             self.totalSpeed = self.totalSpeed + 0.2
             self.angle = ((math.pi / 4) * (self.yball - (self.y1 + self.paddle_length / 2)) / (self.paddle_length / 2))
             self.xball = 15
-            r = 1
+            r += 10.0
         elif (
                 self.yball > self.y2 and self.yball < self.y2 + self.paddle_length and self.xball > self.w - 15 and self.xball < self.w):
             self.totalSpeed = self.totalSpeed + 0.2
@@ -96,16 +102,15 @@ class pongGame:
         self.ballVDirection = self.totalSpeed * math.sin(self.angle)
         self.xball = self.xball + self.ballHDirection
         self.yball = self.yball + self.ballVDirection
-        # self.last_action = action
-        # return reward
         if ai_p1:
             # also move the player paddle on its own
             if self.yball > self.y1 + self.paddle_length / 2:
                 self.y1 = self.y1 + 8
             elif self.yball < self.y1 + self.paddle_length / 2:
                 self.y1 = self.y1 - 8
-                
+
         self.draw()
+        # return reward
         return r
 
     # a function to draw the actual game frame. If called it is probably best to use a delay between frames (for example time.sleep(0.03) for about 30 frames per second.

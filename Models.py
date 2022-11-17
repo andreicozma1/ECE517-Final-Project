@@ -17,74 +17,95 @@ class Models:
     def m_dense(self, **kwargs):
         logging.info("Model: m_dense")
         logging.info(f"kwargs: {pprint.pformat(kwargs)}")
-        inputs = keras.layers.Input(shape=(self.e_num_states,), name="input")
+        inputs = keras.layers.Input(shape=(1, self.e_num_states,), name="input")
 
         # Dense
-        l1 = keras.layers.Dense(2048, activation="relu")
-        l2 = keras.layers.Dense(1024, activation="relu")
+        common = keras.layers.Dense(4096, name="l1")(inputs)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dropout(0.1)(common)
+        common = keras.layers.Dense(2048, name="l2")(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dropout(0.1)(common)
+        common = keras.layers.Dense(1024, name="l3")(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dropout(0.1)(common)
 
-        common = l1(inputs)
-        common = l2(common)
+        # common = keras.layers.LeakyReLU(alpha=0.1)(common)
+        # actor = keras.layers.Dense(512)(common)
+        # critic = keras.layers.Dense(512)(common)
 
         ac_layer = A2C(self.e_num_actions)(actor_inputs=common, critic_inputs=common)
 
         model = keras.Model(inputs=inputs, outputs=ac_layer, name="m_dense")
-        optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
+        # RMSProp
+        optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
+        # optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
         # optimizer = tfa.optimizers.AdamW(
         #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
         # )
-        huber_loss = keras.losses.Huber()
+        # loss = keras.losses.Huber()
+        loss = keras.losses.MeanSquaredError()
 
-        return model, optimizer, huber_loss
+        return model, optimizer, loss
 
     def m_rnn(self, **kwargs):
         logging.info("Model: m_rnn")
         logging.info(f"kwargs: {pprint.pformat(kwargs)}")
-        inputs = keras.layers.Input(shape=(self.e_num_states,))
+        inputs = keras.layers.Input(batch_input_shape=(1, None, self.e_num_states), name="input")
 
-        # RNN
-        common = keras.layers.Reshape((1, self.e_num_states))(inputs)
-        common = keras.layers.SimpleRNN(256, return_sequences=True)(common)
-        common = keras.layers.Dropout(0.2)(common)
-        common = keras.layers.SimpleRNN(256, return_sequences=False)(common)
-        common = keras.layers.Dropout(0.2)(common)
+        rnn = keras.layers.SimpleRNN(512, return_sequences=True, stateful=True)(inputs)
+        rnn = keras.layers.SimpleRNN(256, return_sequences=False, stateful=True)(rnn)
 
-        actor = keras.layers.Dense(self.e_num_actions, activation="softmax")(common)
-        critic = keras.layers.Dense(1)(common)
+        dense = keras.layers.Dense(512, activation="relu")(rnn)
+        dense = keras.layers.Dense(1024, activation="relu")(dense)
+        dense = keras.layers.Dense(2048, activation="relu")(dense)
+        dense = keras.layers.Dense(512, activation="relu")(dense)
 
-        model = keras.Model(inputs=inputs, outputs=[actor, critic], name="m_rnn")
+        critic = keras.layers.Dense(512, activation="linear")(dense)
+        critic = keras.layers.Dense(128, activation="linear")(critic)
+
+        actor = keras.layers.Dense(512, activation="relu", name="abcv")(dense)
+        # actor = keras.layers.Dropout(0.2)(actor)
+        actor = keras.layers.Dense(128, activation="relu", name="dev")(actor)
+        # actor = keras.layers.Dropout(0.2)(actor)
+
+        # critic = keras.layers.LeakyReLU(alpha=0.1)(critic)
+
+        ac_layer = A2C(self.e_num_actions)(actor_inputs=actor, critic_inputs=critic)
+
+        model = keras.Model(inputs=inputs, outputs=ac_layer, name="m_rnn")
         optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
         # optimizer = tfa.optimizers.AdamW(
         #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
         # )
-        huber_loss = keras.losses.Huber()
+        loss = keras.losses.Huber()
+        # loss = keras.losses.MeanSquaredError()
 
-        return model, optimizer, huber_loss
+        return model, optimizer, loss
 
     def m_lstm(self, **kwargs):
         logging.info("Model: m_lstm")
         logging.info(f"kwargs: {pprint.pformat(kwargs)}")
-        inputs = keras.layers.Input(shape=(self.e_num_states,))
+        inputs = keras.layers.Input(shape=(1, self.e_num_states,), name="input")
 
         # LSTM
-        common = keras.layers.Reshape((1, self.e_num_states))(inputs)
-        common = keras.layers.LSTM(256, return_sequences=True)(common)
+        common = keras.layers.LSTM(256, return_sequences=True)(inputs)
         common = keras.layers.Dropout(0.2)(common)
         common = keras.layers.LSTM(256, return_sequences=False)(common)
         common = keras.layers.Dropout(0.2)(common)
 
-        actor = keras.layers.Dense(self.e_num_actions, activation="softmax", )(common)
-        critic = keras.layers.Dense(1)(common)
+        ac_layer = A2C(self.e_num_actions)(actor_inputs=common, critic_inputs=common)
 
-        model = keras.Model(inputs=inputs, outputs=[actor, critic], name="m_lstm")
+        model = keras.Model(inputs=inputs, outputs=ac_layer, name="m_lstm")
         optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
         # optimizer = tfa.optimizers.AdamW(
         #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
         # )
         huber_loss = keras.losses.Huber()
+        loss = keras.losses.MeanSquaredError()
 
         return model, optimizer, huber_loss
 
@@ -136,18 +157,17 @@ class Models:
         critic = keras.layers.Flatten()(att_c)
 
         # Output
-        action = keras.layers.Dense(self.e_num_actions, activation="softmax")(actor)
-        critic = keras.layers.Dense(1)(critic)
+        ac_layer = A2C(self.e_num_actions)(actor_inputs=actor, critic_inputs=critic)
 
-        model = keras.Model(inputs=inputs, outputs=[action, critic])
+        model = keras.Model(inputs=inputs, outputs=ac_layer)
         optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
         # optimizer = tfa.optimizers.AdamW(
         #     learning_rate=0.01, weight_decay=0.3, amsgrad=True
         # )
-        huber_loss = keras.losses.Huber()
+        loss = keras.losses.Huber()
 
-        return model, optimizer, huber_loss
+        return model, optimizer, loss
 
 
 class A2C(keras.layers.Layer):
