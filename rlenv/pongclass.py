@@ -50,9 +50,11 @@ class pongGame:
         #                 dtype=np.float32)
         # return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
         #                 dtype=np.float32)
-        return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection,
-                         self.last_action],
+        return np.array([self.y1, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
                         dtype=np.float32)
+        # return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection,
+        #                  self.last_action],
+        #                 dtype=np.float32)
 
         # return np.array([self.y1, self.xball, self.yball], dtype=np.float32)
 
@@ -79,7 +81,7 @@ class pongGame:
             self.totalSpeed = self.totalSpeed + 0.2
             self.angle = ((math.pi / 4) * (self.yball - (self.y1 + self.paddle_length / 2)) / (self.paddle_length / 2))
             self.xball = 15
-            r += 10.0
+            r += 1
         elif (
                 self.yball > self.y2 and self.yball < self.y2 + self.paddle_length and self.xball > self.w - 15 and self.xball < self.w):
             self.totalSpeed = self.totalSpeed + 0.2
