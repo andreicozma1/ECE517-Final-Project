@@ -2,6 +2,7 @@ import logging
 import pprint
 
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 from CustomLayers import A2C
 
@@ -9,7 +10,7 @@ keras = tf.keras
 
 
 class NeuralNet:
-    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.0001, **kwargs):
+    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.0005, **kwargs):
         self.num_states: int = num_states
         self.num_actions: int = num_actions
         self.learning_rate: float = learning_rate
@@ -46,55 +47,66 @@ class NeuralNet:
         # optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=self.learning_rate)
         # optimizer = tfa.optimizers.AdamW(
-        #     learning_rate=self.learning_rate, weight_decay=0.3, amsgrad=True
+        #         learning_rate=self.learning_rate, weight_decay=0.000005, amsgrad=True
         # )
         optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
 
         ###################################################################
         # LOSS
-        loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
+        # loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
         # loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
-        # loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
+        loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
 
         return model, optimizer, loss
 
     def inner_dense(self, inputs, **kwargs):
         common = keras.layers.Flatten()(inputs)
-        common = keras.layers.Dense(512,
-                                    activation="elu",
-                                    kernel_initializer="he_normal",
-                                    kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        common = keras.layers.Dropout(0.2)(common)
-        common = keras.layers.Dense(512,
-                                    activation="elu",
-                                    kernel_initializer="he_normal",
-                                    kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        common = keras.layers.Dropout(0.2)(common)
-        common = keras.layers.Dense(512,
-                                    activation="elu",
-                                    kernel_initializer="he_normal",
-                                    kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        common = keras.layers.Dropout(0.2)(common)
-        common = keras.layers.Dense(512,
-                                    activation="elu",
-                                    kernel_initializer="he_normal",
-                                    kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        common = keras.layers.Dropout(0.2)(common)
-        common = keras.layers.Dense(512,
-                                    activation="elu",
-                                    kernel_initializer="he_normal",
-                                    kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        common = keras.layers.Dropout(0.2)(common)
+        # common = keras.layers.Dense(512,
+        #                             activation="elu",
+        #                             kernel_initializer="he_normal",
+        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
+        # common = keras.layers.Dropout(0.2)(common)
+        # common = keras.layers.Dense(512,
+        #                             activation="elu",
+        #                             kernel_initializer="he_normal",
+        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
+        # common = keras.layers.Dropout(0.2)(common)
+        # common = keras.layers.Dense(512,
+        #                             activation="elu",
+        #                             kernel_initializer="he_normal",
+        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
+        # common = keras.layers.Dropout(0.2)(common)
+        # common = keras.layers.Dense(512,
+        #                             activation="elu",
+        #                             kernel_initializer="he_normal",
+        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
+        # common = keras.layers.Dropout(0.2)(common)
+        # common = keras.layers.Dense(512,
+        #                             activation="elu",
+        #                             kernel_initializer="he_normal",
+        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
+        # common = keras.layers.Dropout(0.2)(common)
 
-        # common = keras.layers.Dense(512, activation="relu", name="l1")(inputs)
-        # common = keras.layers.Dense(256, activation="relu", name="l2")(common)
-        # common = keras.layers.Dense(128, activation="relu", name="l3")(common)
+        # common = keras.layers.Dense(2048, activation="relu", name="l1")(common)
+        # common = keras.layers.Dense(1024, activation="relu", name="l2")(common)
+        # common = keras.layers.Dense(1024, activation="relu", name="l3")(common)
+        # common = keras.layers.Dense(512, activation="relu", name="l4")(common)
+        # common = keras.layers.Dense(512, activation="relu", name="l5")(common)
 
-        # common = keras.layers.Dense(512, name="l1")(inputs)
-        # common = keras.layers.LeakyReLU(alpha=0.1)(common)
-        # common = keras.layers.Dense(512, name="l2")(common)
-        # common = keras.layers.LeakyReLU(alpha=0.1)(common)
-
+        common = keras.layers.Dense(64)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(128)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(256)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(512)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(256)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(128)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(64)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
         # common = keras.layers.Dropout(0.1)(common)
 
         # common = keras.layers.LeakyReLU(alpha=0.1)(common)
@@ -104,30 +116,42 @@ class NeuralNet:
         return common, common
 
     def inner_rnn(self, inputs, **kwargs):
-        rnn = keras.layers.SimpleRNN(512, return_sequences=True, stateful=True)(inputs)
+        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(inputs)
+        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(rnn)
+        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(rnn)
+        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(rnn)
         rnn = keras.layers.SimpleRNN(256, return_sequences=False, stateful=True)(rnn)
 
         dense = keras.layers.Dense(512, activation="relu")(rnn)
-        dense = keras.layers.Dense(1024, activation="relu")(dense)
+        dense = keras.layers.Dense(512, activation="relu")(dense)
+        dense = keras.layers.Dense(512, activation="relu")(dense)
+        dense = keras.layers.Dense(512, activation="relu")(dense)
         dense = keras.layers.Dense(512, activation="relu")(dense)
 
-        critic = keras.layers.Dense(512, activation="linear")(dense)
+        critic = keras.layers.Dense(256, activation="linear")(dense)
         critic = keras.layers.Dense(128, activation="linear")(critic)
 
-        actor = keras.layers.Dense(512, activation="relu", name="abcv")(dense)
-        # actor = keras.layers.Dropout(0.2)(actor)
+        actor = keras.layers.Dense(256, activation="relu", name="abcv")(dense)
         actor = keras.layers.Dense(128, activation="relu", name="dev")(actor)
         # actor = keras.layers.Dropout(0.2)(actor)
 
         return actor, critic
 
     def inner_lstm(self, inputs, **kwargs):
-        common = keras.layers.LSTM(256, return_sequences=True)(inputs)
-        common = keras.layers.Dropout(0.2)(common)
-        common = keras.layers.LSTM(256, return_sequences=False)(common)
-        common = keras.layers.Dropout(0.2)(common)
+        lstm = keras.layers.LSTM(128, return_sequences=True, stateful=True)(inputs)
+        lstm = keras.layers.LSTM(128, return_sequences=True, stateful=True)(lstm)
+        lstm = keras.layers.LSTM(128, return_sequences=True, stateful=True)(lstm)
+        lstm = keras.layers.LSTM(128, return_sequences=True, stateful=True)(lstm)
+        lstm = keras.layers.LSTM(128, return_sequences=False, stateful=True)(lstm)
 
-        return common, common
+        dense = keras.layers.Dense(128, activation="relu")(lstm)
+        dense = keras.layers.Dense(128, activation="relu")(dense)
+        dense = keras.layers.Dense(128, activation="relu")(dense)
+        dense = keras.layers.Dense(128, activation="relu")(dense)
+        dense = keras.layers.Dense(128, activation="relu")(dense)
+        dense = keras.layers.Dense(128, activation="relu")(dense)
+
+        return dense, dense
 
     def inner_attention(self, inputs, **kwargs):
         common = keras.layers.LSTM(128, return_sequences=True, stateful=False)(inputs)

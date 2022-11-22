@@ -17,7 +17,7 @@ class Experiment:
         logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 
     def run_experiment(self,
-                       min_episodes_criterion=500,
+                       min_episodes_criterion=50,
                        max_episodes=50000,
                        max_steps_per_episode=2500,
                        use_wandb: bool = True):

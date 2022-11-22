@@ -11,7 +11,7 @@ from rlenv import pongGame
 
 class Environment:
     def __init__(self, draw=False, draw_speed=None):
-        self.game = pongGame(400, 400, draw=draw, draw_speed=draw_speed)
+        self.game = pongGame(200, 200, draw=draw, draw_speed=draw_speed)
         self.num_states = self.game.getState().shape[0]
         self.num_actions = 3
         self.state_scaler = MinMaxScaler(feature_range=(-1, 1))
