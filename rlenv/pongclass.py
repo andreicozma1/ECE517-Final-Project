@@ -4,12 +4,12 @@ import pygame
 import math
 import numpy as np
 import random
-
+from typing import Union
 
 # pong game class
 class pongGame:
     # initializing parameters
-    def __init__(self, h, w, draw=True, draw_speed: float | None = None):
+    def __init__(self, h, w, draw=True, draw_speed: Union[float,None] = None):
         # window height
         self.h = h
         # window width

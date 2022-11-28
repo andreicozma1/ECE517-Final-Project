@@ -30,11 +30,11 @@ class Experiment:
             episode_stats = self.agent.train_step(self.env, max_steps_per_episode)
 
             episodes_reward.append(episode_stats["total_reward"])
-            stats |= {
+            stats.update({
                     "episode"       : ep,
                     "running_reward": np.mean(episodes_reward),
                     **episode_stats
-            }
+            })
             # wandb.log(stats)
 
             tq.set_postfix(episode_reward=stats['total_reward'],
