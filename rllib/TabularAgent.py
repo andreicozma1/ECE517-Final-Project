@@ -49,25 +49,25 @@ class Tabular(Agent):
         pass
 
     @abc.abstractmethod
-    def on_update(self, rewards, next_state):
+    def on_update(self, rewards, last_state, last_action, next_state):
         pass
 
     def run_episode(self, env: Environment, max_steps: int, deterministic: bool = False) -> Tuple[np.array, dict]:
         self.on_episode_start()
         reward_hist = []
 
-        state = env.reset()
-        initial_state_shape = state.shape
+        next_state = env.reset()
+        initial_state_shape = next_state.shape
 
         for t in range(max_steps):
-            action = self.get_action(t, state)
-            state, reward, done = env.step(action)
-            state = state.reshape(initial_state_shape)
+            action = self.get_action(t, next_state)
+            last_state, last_action = next_state.copy(), action
+            next_state, reward, done = env.step(action)
+            next_state = next_state.reshape(initial_state_shape)
             reward_hist.append(reward)
             if done:
                 break
-            self.on_update(reward, state)
-
+            self.on_update(reward, last_state, last_action, next_state)
         self.on_episode_end()
         stats = {
             "steps": len(reward_hist),

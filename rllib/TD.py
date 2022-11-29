@@ -12,6 +12,7 @@ from Environment import Environment
 from Experiment import Experiment
 from utils import logging_setup
 
+
 class TD(Tabular):
     def __init__(self,
                  algorithm:str,
@@ -30,24 +31,18 @@ class TD(Tabular):
         pass
 
     def get_action(self, _, state, deterministic=False):
-        self.last_state = self.bin_state(state.flatten())
+        state = self.bin_state(state.flatten())
         if not deterministic and np.random.random() < self.epsilon:
-            self.last_action = np.random.randint(self.n_actions)
-            # print('random', self.last_state, self.last_action)
-        else:
-            self.last_action = np.argmax(self.Q[tuple(self.last_state)])
-            # print('greedy', self.Q.shape, len(self.Q[tuple(self.last_state)]), self.last_state, self.last_action)
-        # print(self.)
-        # print(self.last_action)
-        return self.last_action
+            return np.random.randint(self.n_actions)
+        return np.argmax(self.Q[tuple(state)])
 
     def on_episode_end(self):
         pass
 
-    def on_update(self, reward, next_state):
+    def on_update(self, reward, last_state, last_action, next_state):
+        last_state, next_state = self.bin_state(last_state.flatten()), self.bin_state(next_state.flatten())
 
-        s,a = self.last_state.flatten(), self.last_action
-        idx = tuple(list(s.copy()) + [a])
+        idx = tuple(list(last_state.copy()) + [last_action])
         current_qsa = self.Q[idx]
 
         if self.alg == 'Q-Learning':
@@ -55,7 +50,7 @@ class TD(Tabular):
 
         elif self.alg == 'SARSA':
             next_action = self.get_action(0, next_state, deterministic=False)
-            next_qsa = self.Q[tuple(list(self.last_state.copy()) + [next_action])]
+            next_qsa = self.Q[tuple(list(next_state.copy()) + [next_action])]
         else:
             raise Exception("Unknown TD learning type")
 
