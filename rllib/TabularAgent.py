@@ -7,7 +7,7 @@ from typing import Tuple
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute()))
 from BaseAgent import BaseAgent
-from Environment import Environment
+from PongEnvironment import PongEnvironment
 from utils import logging_setup
 
 
@@ -52,7 +52,7 @@ class TabularAgent(BaseAgent):
     def on_update(self, rewards, last_state, last_action, next_state):
         pass
 
-    def run_episode(self, env: Environment, max_steps: int, deterministic: bool = False) -> Tuple[np.array, dict]:
+    def run_episode(self, env: PongEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[np.array, dict]:
         self.on_episode_start()
         reward_hist = []
 
@@ -75,6 +75,6 @@ class TabularAgent(BaseAgent):
         }
         return np.array(reward_hist, dtype=np.int32), stats
 
-    def train_step(self, env: Environment, max_steps_per_episode: int) -> dict:
+    def train_step(self, env: PongEnvironment, max_steps_per_episode: int) -> dict:
         rewards, stats = self.run_episode(env, max_steps_per_episode, deterministic=False)
         return stats

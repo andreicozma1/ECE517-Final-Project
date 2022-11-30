@@ -7,7 +7,7 @@ import pygame
 import tensorflow as tf
 from matplotlib import pyplot as plt
 import tensorflow_probability as tfp
-from Environment import Environment
+from PongEnvironment import PongEnvironment
 from Experiment import Experiment
 from NeuralNet import NeuralNet
 from BaseAgent import BaseAgent
@@ -79,34 +79,36 @@ class A2CAgent(BaseAgent):
         # Compute the gradients from the loss
         grads = tape.gradient(loss, self.nn.model.trainable_variables)
         # Pygame stopped responding fix
-        # pygame.event.pump()
+        pygame.event.pump()
         # Apply the gradients to the model's parameters
         self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
 
     def compute_loss(self,
                      action_probs: tf.Tensor,
-                     critic_vals: tf.Tensor,
-                     actual_vals: tf.Tensor) -> tf.Tensor:
+                     critic_returns: tf.Tensor,
+                     actual_returns: tf.Tensor) -> tf.Tensor:
         """Computes the combined Actor-Critic loss."""
         if self.nn.loss is None:
             raise ValueError("Loss is None")
+        # create multipliers for actor and critic losses
+        actor_loss_multiplier = 1.0
+        critic_loss_multiplier = 1.0
 
-        advantage = tf.math.subtract(critic_vals, critic_vals)
+        advantage = tf.math.subtract(actual_returns, critic_returns)
         # advantage = tf.square(advantage)
         # print(f"ARs: {actual_vals.shape} | CRs: {critic_vals.shape} | Adv: {advantage.shape}")
 
-        actor_losses = tf.math.multiply(-tf.math.log(action_probs), advantage) * 0.8
-        actor_loss_sum = tf.math.reduce_sum(actor_losses)
+        action_log_probs = -1 * tf.math.log(action_probs)
+        actor_losses = actor_loss_multiplier * tf.math.multiply(action_log_probs, advantage)
 
-        critic_losses = self.nn.loss(critic_vals, actual_vals)
+        critic_losses = critic_loss_multiplier * self.nn.loss(critic_returns, actual_returns)
         critic_losses = tf.reshape(critic_losses, shape=(tf.shape(actor_losses)))
-        critic_loss_sum = tf.math.reduce_sum(critic_losses)
 
         total_losses = actor_losses + critic_losses
 
         total_loss_sum = tf.math.reduce_sum(total_losses)
 
-        self.plot_tr(action_probs, actor_losses, actual_vals, advantage, critic_losses, critic_vals, total_losses)
+        self.plot_tr(action_probs, actor_losses, actual_returns, advantage, critic_losses, critic_returns, total_losses)
 
         return total_loss_sum
 
@@ -128,7 +130,7 @@ class A2CAgent(BaseAgent):
                          where=tf.squeeze(actual_vals) > tf.squeeze(critic_vals), color='green', alpha=0.15)
         plt.fill_between(tf.range(tf.shape(actual_vals)[0]), tf.squeeze(actual_vals), tf.squeeze(critic_vals),
                          where=tf.squeeze(actual_vals) < tf.squeeze(critic_vals), color='red', alpha=0.15)
-        plt.ylim(-5, 10)
+        plt.ylim(-5, 2)
         plt.grid(color='lightgray', linestyle='--', linewidth=0.5)
         plt.tight_layout()
         plt.legend(loc='lower left')
@@ -136,8 +138,8 @@ class A2CAgent(BaseAgent):
 
 
 def main():
-    env = Environment(draw=True)
-    nn = NeuralNet("dense", env.num_states, env.num_actions)
+    env = PongEnvironment(draw=True)
+    nn = NeuralNet("lstm", env.num_states, env.num_actions)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent)

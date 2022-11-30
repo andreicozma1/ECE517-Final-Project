@@ -10,7 +10,7 @@ keras = tf.keras
 
 
 class NeuralNet:
-    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.0005, **kwargs):
+    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.01, **kwargs):
         self.num_states: int = num_states
         self.num_actions: int = num_actions
         self.learning_rate: float = learning_rate
@@ -44,12 +44,12 @@ class NeuralNet:
 
         ###################################################################
         # OPTIMIZER
-        # optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
+        optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=self.learning_rate)
         # optimizer = tfa.optimizers.AdamW(
         #         learning_rate=self.learning_rate, weight_decay=0.000005, amsgrad=True
         # )
-        optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
+        # optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
 
         ###################################################################
         # LOSS
@@ -116,42 +116,49 @@ class NeuralNet:
         return common, common
 
     def inner_rnn(self, inputs, **kwargs):
-        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(inputs)
-        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(rnn)
-        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(rnn)
-        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(rnn)
+        encoder = keras.layers.Dense(512)(inputs)
+        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
+        encoder = keras.layers.Dense(512)(encoder)
+        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
+        encoder = keras.layers.Dense(256)(encoder)
+        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
+        encoder = keras.layers.Dense(256)(encoder)
+        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
+
+        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(encoder)
         rnn = keras.layers.SimpleRNN(256, return_sequences=False, stateful=True)(rnn)
 
-        dense = keras.layers.Dense(512, activation="relu")(rnn)
-        dense = keras.layers.Dense(512, activation="relu")(dense)
-        dense = keras.layers.Dense(512, activation="relu")(dense)
-        dense = keras.layers.Dense(512, activation="relu")(dense)
-        dense = keras.layers.Dense(512, activation="relu")(dense)
+        common = keras.layers.Dense(128)(rnn)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(128)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
 
-        critic = keras.layers.Dense(256, activation="linear")(dense)
-        critic = keras.layers.Dense(128, activation="linear")(critic)
-
-        actor = keras.layers.Dense(256, activation="relu", name="abcv")(dense)
-        actor = keras.layers.Dense(128, activation="relu", name="dev")(actor)
-        # actor = keras.layers.Dropout(0.2)(actor)
-
-        return actor, critic
+        return common, common
 
     def inner_lstm(self, inputs, **kwargs):
-        lstm = keras.layers.LSTM(128, return_sequences=True, stateful=True)(inputs)
-        lstm = keras.layers.LSTM(128, return_sequences=True, stateful=True)(lstm)
-        lstm = keras.layers.LSTM(128, return_sequences=True, stateful=True)(lstm)
-        lstm = keras.layers.LSTM(128, return_sequences=True, stateful=True)(lstm)
-        lstm = keras.layers.LSTM(128, return_sequences=False, stateful=True)(lstm)
+        encoder = keras.layers.Dense(128)(inputs)
+        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
+        encoder = keras.layers.Dense(64)(encoder)
+        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
+        encoder = keras.layers.Dense(32)(encoder)
+        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
+        encoder = keras.layers.Dense(32)(encoder)
+        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
 
-        dense = keras.layers.Dense(128, activation="relu")(lstm)
-        dense = keras.layers.Dense(128, activation="relu")(dense)
-        dense = keras.layers.Dense(128, activation="relu")(dense)
-        dense = keras.layers.Dense(128, activation="relu")(dense)
-        dense = keras.layers.Dense(128, activation="relu")(dense)
-        dense = keras.layers.Dense(128, activation="relu")(dense)
+        lstm = keras.layers.LSTM(32, return_sequences=True, stateful=True)(encoder)
+        lstm = keras.layers.LSTM(32, return_sequences=True, stateful=True)(lstm)
+        lstm = keras.layers.LSTM(32, return_sequences=False, stateful=True)(lstm)
 
-        return dense, dense
+        common = keras.layers.Dense(32)(lstm)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(32)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(32)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(32)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+
+        return common, common
 
     def inner_attention(self, inputs, **kwargs):
         common = keras.layers.LSTM(128, return_sequences=True, stateful=False)(inputs)

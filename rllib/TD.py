@@ -9,7 +9,7 @@ import numpy as np
 # print(pathlib.Path(__file__).parent.parent.absolute())
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute()))
 from TabularAgent import TabularAgent
-from Environment import Environment
+from PongEnvironment import PongEnvironment
 from Experiment import Experiment
 from utils import logging_setup
 
@@ -60,7 +60,7 @@ class TD(TabularAgent):
 
 
 if __name__ == "__main__":
-    env = Environment(draw=False)
+    env = PongEnvironment(draw=False)
     agent = TD(
             algorithm="Q-Learning",
             quantize=8,

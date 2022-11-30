@@ -6,13 +6,13 @@ import numpy as np
 import tqdm
 
 from BaseAgent import BaseAgent
-from Environment import Environment
+from PongEnvironment import PongEnvironment
 
 
 class Experiment:
-    def __init__(self, env: Environment, agent: BaseAgent):
+    def __init__(self, env: PongEnvironment, agent: BaseAgent):
         super().__init__()
-        self.env: Environment = env
+        self.env: PongEnvironment = env
         self.agent: BaseAgent = agent
         logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 

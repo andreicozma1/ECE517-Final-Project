@@ -6,6 +6,7 @@ import numpy as np
 import random
 from typing import Union
 
+
 # pong game class
 class pongGame:
     # initializing parameters

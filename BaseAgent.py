@@ -8,7 +8,7 @@ import pygame
 import tensorflow as tf
 from matplotlib import pyplot as plt
 
-from Environment import Environment
+from PongEnvironment import PongEnvironment
 from NeuralNet import NeuralNet
 
 keras = tf.keras
@@ -46,7 +46,7 @@ class BaseAgent:
         # returns = tf.math.divide(returns, tf.math.reduce_max(returns))
         return returns
 
-    def run_episode(self, env: Environment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor, dict]:
+    def run_episode(self, env: PongEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor, dict]:
         self.on_episode_start()
         reward_hist = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
 
@@ -85,7 +85,7 @@ class BaseAgent:
         pass
 
     # @tf.function
-    def train_step(self, env: Environment, max_steps_per_episode: int) -> dict:
+    def train_step(self, env: PongEnvironment, max_steps_per_episode: int) -> dict:
         """Runs a model training step."""
 
         with tf.GradientTape() as tape:

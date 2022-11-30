@@ -9,7 +9,7 @@ from sklearn.preprocessing import MinMaxScaler
 from rlenv import pongGame
 
 
-class Environment:
+class PongEnvironment:
     def __init__(self, draw=False, draw_speed=None):
         self.game = pongGame(200, 200, draw=draw, draw_speed=draw_speed)
         self.num_states = self.game.getState().shape[0]
