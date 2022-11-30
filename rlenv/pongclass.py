@@ -51,11 +51,11 @@ class pongGame:
         #                 dtype=np.float32)
         # return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
         #                 dtype=np.float32)
-        return np.array([self.y1, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
-                        dtype=np.float32)
-        # return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection,
-        #                  self.last_action],
+        # return np.array([self.y1, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
         #                 dtype=np.float32)
+        return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection,
+                         self.last_action],
+                        dtype=np.float32)
 
         # return np.array([self.y1, self.xball, self.yball], dtype=np.float32)
 

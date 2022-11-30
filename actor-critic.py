@@ -34,24 +34,33 @@ class A2CAgent(BaseAgent):
         self.nn: NeuralNet = nn
         self.action_probs_hist = None
         self.critic_returns_hist = None
+        self.state = None
+        self.num_timesteps = self.nn.input_shape[1]
 
     def on_episode_start(self):
-        self.action_probs_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        self.critic_returns_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        self.action_probs_hist = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+        self.critic_returns_hist = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+        self.state = np.zeros(self.nn.input_shape)
 
-    def get_action(self, t, state):
+    def get_action(self, t, state_t):
         if self.nn.model is None:
             raise ValueError("Model is None")
-        state = tf.reshape(state, self.nn.input_shape)
+        # state = tf.reshape(state, self.nn.input_shape)
+        state_t = np.expand_dims(state_t, axis=0)
+        self.state = np.append(self.state, state_t, axis=1)
+        self.state = self.state[:, -self.num_timesteps:, :]
 
-        action_logits_t, critic_value = self.nn.model(state)
+        # print("State: ", self.state)
+        # print("State shape: ", self.state.shape)
+        action_logits_t, critic_value = self.nn.model(self.state)
+        # print(f"Logits: {action_logits_t} | Critic Value: {critic_value}")
+
         action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
         critic_value = tf.squeeze(critic_value)
 
         # action = tfp.distributions.Categorical(logits=action_logits_t[0]).sample()
         action = tf.random.categorical(action_logits_t, 1)[0, 0]
         action_probs_t = tf.nn.softmax(action_logits_t)
-        # epsilon decay based on t value
 
         # print(f"Logits: {action_logits_t} | Action: {action} | Probs: {action_probs_t} | Critic Value: {critic_value}")
         self.critic_returns_hist = self.critic_returns_hist.write(t, critic_value)
@@ -59,9 +68,38 @@ class A2CAgent(BaseAgent):
         return action
 
     def on_episode_end(self):
-        self.nn.model.reset_states()
+        # self.nn.model.reset_states()
         self.action_probs_hist = self.action_probs_hist.stack()
         self.critic_returns_hist = self.critic_returns_hist.stack()
+
+    def compute_loss(self,
+                     action_probs: tf.Tensor,
+                     critic_returns: tf.Tensor,
+                     actual_returns: tf.Tensor) -> tf.Tensor:
+        """Computes the combined Actor-Critic loss."""
+        if self.nn.loss is None:
+            raise ValueError("Loss is None")
+        # create multipliers for actor and critic losses
+        actor_loss_multiplier = 1.0
+        critic_loss_multiplier = 0.5
+
+        advantage = tf.math.subtract(actual_returns, critic_returns)
+        # advantage = tf.square(advantage)
+        # print(f"ARs: {actual_vals.shape} | CRs: {critic_vals.shape} | Adv: {advantage.shape}")
+
+        action_log_probs = -1 * tf.math.log(action_probs)
+        actor_losses = actor_loss_multiplier * tf.math.multiply(action_log_probs, advantage)
+
+        critic_losses = critic_loss_multiplier * self.nn.loss(critic_returns, actual_returns)
+        critic_losses = tf.reshape(critic_losses, shape=(tf.shape(actor_losses)))
+
+        total_losses = actor_losses + critic_losses
+
+        total_loss_sum = tf.math.reduce_sum(total_losses)
+
+        self.plot_tr(action_probs, actor_losses, actual_returns, advantage, critic_losses, critic_returns, total_losses)
+
+        return total_loss_sum
 
     def on_update(self, rewards, tape):
         if self.nn.optimizer is None:
@@ -83,53 +121,27 @@ class A2CAgent(BaseAgent):
         # Apply the gradients to the model's parameters
         self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
 
-    def compute_loss(self,
-                     action_probs: tf.Tensor,
-                     critic_returns: tf.Tensor,
-                     actual_returns: tf.Tensor) -> tf.Tensor:
-        """Computes the combined Actor-Critic loss."""
-        if self.nn.loss is None:
-            raise ValueError("Loss is None")
-        # create multipliers for actor and critic losses
-        actor_loss_multiplier = 1.0
-        critic_loss_multiplier = 1.0
-
-        advantage = tf.math.subtract(actual_returns, critic_returns)
-        # advantage = tf.square(advantage)
-        # print(f"ARs: {actual_vals.shape} | CRs: {critic_vals.shape} | Adv: {advantage.shape}")
-
-        action_log_probs = -1 * tf.math.log(action_probs)
-        actor_losses = actor_loss_multiplier * tf.math.multiply(action_log_probs, advantage)
-
-        critic_losses = critic_loss_multiplier * self.nn.loss(critic_returns, actual_returns)
-        critic_losses = tf.reshape(critic_losses, shape=(tf.shape(actor_losses)))
-
-        total_losses = actor_losses + critic_losses
-
-        total_loss_sum = tf.math.reduce_sum(total_losses)
-
-        self.plot_tr(action_probs, actor_losses, actual_returns, advantage, critic_losses, critic_returns, total_losses)
-
-        return total_loss_sum
-
     def plot_tr(self, action_probs, actor_losses, actual_vals, advantage, critic_losses, critic_vals, total_losses):
         plt.ion()
+        # network_state = self.network_state_hist.stack()
+        # network_state = tf.squeeze(network_state)
+        # network_state = tf.transpose(network_state)
+        # plt.imshow(network_state)
         plt.plot(tf.squeeze(action_probs), label='Actor Probs', color='steelblue')
-        # action log probs
-        # plt.plot(tf.squeeze(action_log_probs), label='action_log_probs', color='blue')
         plt.plot(tf.squeeze(actor_losses), label='Actor Loss', color="lightskyblue")
         plt.plot(tf.squeeze(critic_losses), label='Critic Loss', color='salmon')
         plt.plot(tf.squeeze(total_losses), label='Total Loss', color='black')
         plt.plot(tf.squeeze(critic_vals), label='Critic Val', color='red')
         plt.plot(tf.squeeze(actual_vals), label='Actual Val', color="green")
         plt.plot(tf.squeeze(advantage), label='Advantage', color='purple')
-        # draw a line through 0
-        plt.axhline(y=0, color='black', linestyle='--')
-        # Highlight the difference between the actual returns and the critic returns
+
         plt.fill_between(tf.range(tf.shape(actual_vals)[0]), tf.squeeze(actual_vals), tf.squeeze(critic_vals),
                          where=tf.squeeze(actual_vals) > tf.squeeze(critic_vals), color='green', alpha=0.15)
         plt.fill_between(tf.range(tf.shape(actual_vals)[0]), tf.squeeze(actual_vals), tf.squeeze(critic_vals),
                          where=tf.squeeze(actual_vals) < tf.squeeze(critic_vals), color='red', alpha=0.15)
+
+        plt.axhline(y=0, color='black', linestyle='--')
+
         plt.ylim(-5, 2)
         plt.grid(color='lightgray', linestyle='--', linewidth=0.5)
         plt.tight_layout()

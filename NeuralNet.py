@@ -10,11 +10,11 @@ keras = tf.keras
 
 
 class NeuralNet:
-    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.01, **kwargs):
+    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.001, **kwargs):
         self.num_states: int = num_states
         self.num_actions: int = num_actions
         self.learning_rate: float = learning_rate
-        self.input_shape = (1, 1, self.num_states)
+        self.input_shape = (1, 25, self.num_states)
         self.model, self.optimizer, self.loss = self.create_model(name, **kwargs)
         logging.info(f"Models Args: {pprint.pformat(self.__dict__)}")
 
@@ -29,6 +29,7 @@ class NeuralNet:
 
         model = keras.Model(inputs=inputs, outputs=ac_layer, name=model_name)
         model.summary()
+
         # config = model.get_config()
         # config_hash = hashlib.md5(json.dumps(config).encode('utf-8')).hexdigest()
         # self._config.update({
@@ -53,45 +54,34 @@ class NeuralNet:
 
         ###################################################################
         # LOSS
+        loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
         # loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
         # loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
-        loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
 
         return model, optimizer, loss
 
+    def inner_lstm(self, inputs, **kwargs):
+        embedding = keras.layers.Dense(128)(inputs)
+        embedding = keras.layers.LeakyReLU(alpha=0.05)(embedding)
+        embedding = keras.layers.Dense(256)(embedding)
+        embedding = keras.layers.LeakyReLU(alpha=0.05)(embedding)
+
+        sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(embedding)
+        lstm = keras.layers.LSTM(128, return_sequences=False)(sequences)
+        lstm = keras.layers.Dropout(0.1)(lstm)
+
+        common = keras.layers.Dense(256)(lstm)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(256)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(256)(common)
+        common = keras.layers.LeakyReLU(alpha=0.05)(common)
+        common = keras.layers.Dense(128)(common)
+
+        return common, common
+
     def inner_dense(self, inputs, **kwargs):
         common = keras.layers.Flatten()(inputs)
-        # common = keras.layers.Dense(512,
-        #                             activation="elu",
-        #                             kernel_initializer="he_normal",
-        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        # common = keras.layers.Dropout(0.2)(common)
-        # common = keras.layers.Dense(512,
-        #                             activation="elu",
-        #                             kernel_initializer="he_normal",
-        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        # common = keras.layers.Dropout(0.2)(common)
-        # common = keras.layers.Dense(512,
-        #                             activation="elu",
-        #                             kernel_initializer="he_normal",
-        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        # common = keras.layers.Dropout(0.2)(common)
-        # common = keras.layers.Dense(512,
-        #                             activation="elu",
-        #                             kernel_initializer="he_normal",
-        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        # common = keras.layers.Dropout(0.2)(common)
-        # common = keras.layers.Dense(512,
-        #                             activation="elu",
-        #                             kernel_initializer="he_normal",
-        #                             kernel_regularizer=keras.regularizers.l2(0.01))(common)
-        # common = keras.layers.Dropout(0.2)(common)
-
-        # common = keras.layers.Dense(2048, activation="relu", name="l1")(common)
-        # common = keras.layers.Dense(1024, activation="relu", name="l2")(common)
-        # common = keras.layers.Dense(1024, activation="relu", name="l3")(common)
-        # common = keras.layers.Dense(512, activation="relu", name="l4")(common)
-        # common = keras.layers.Dense(512, activation="relu", name="l5")(common)
 
         common = keras.layers.Dense(64)(common)
         common = keras.layers.LeakyReLU(alpha=0.05)(common)
@@ -112,51 +102,6 @@ class NeuralNet:
         # common = keras.layers.LeakyReLU(alpha=0.1)(common)
         # actor = keras.layers.Dense(512)(common)
         # critic = keras.layers.Dense(512)(common)
-
-        return common, common
-
-    def inner_rnn(self, inputs, **kwargs):
-        encoder = keras.layers.Dense(512)(inputs)
-        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
-        encoder = keras.layers.Dense(512)(encoder)
-        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
-        encoder = keras.layers.Dense(256)(encoder)
-        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
-        encoder = keras.layers.Dense(256)(encoder)
-        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
-
-        rnn = keras.layers.SimpleRNN(256, return_sequences=True, stateful=True)(encoder)
-        rnn = keras.layers.SimpleRNN(256, return_sequences=False, stateful=True)(rnn)
-
-        common = keras.layers.Dense(128)(rnn)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(128)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-
-        return common, common
-
-    def inner_lstm(self, inputs, **kwargs):
-        encoder = keras.layers.Dense(128)(inputs)
-        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
-        encoder = keras.layers.Dense(64)(encoder)
-        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
-        encoder = keras.layers.Dense(32)(encoder)
-        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
-        encoder = keras.layers.Dense(32)(encoder)
-        encoder = keras.layers.LeakyReLU(alpha=0.05)(encoder)
-
-        lstm = keras.layers.LSTM(32, return_sequences=True, stateful=True)(encoder)
-        lstm = keras.layers.LSTM(32, return_sequences=True, stateful=True)(lstm)
-        lstm = keras.layers.LSTM(32, return_sequences=False, stateful=True)(lstm)
-
-        common = keras.layers.Dense(32)(lstm)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(32)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(32)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(32)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
 
         return common, common
 
