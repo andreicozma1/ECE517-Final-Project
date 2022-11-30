@@ -5,15 +5,15 @@ import pprint
 import numpy as np
 import tqdm
 
-from Agent import Agent
+from BaseAgent import BaseAgent
 from Environment import Environment
 
 
 class Experiment:
-    def __init__(self, env: Environment, agent: Agent):
+    def __init__(self, env: Environment, agent: BaseAgent):
         super().__init__()
         self.env: Environment = env
-        self.agent: Agent = agent
+        self.agent: BaseAgent = agent
         logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 
     def run_experiment(self,

@@ -6,12 +6,12 @@ import numpy as np
 from typing import Tuple
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute()))
-from Agent import Agent
+from BaseAgent import BaseAgent
 from Environment import Environment
 from utils import logging_setup
 
 
-class Tabular(Agent):
+class TabularAgent(BaseAgent):
     def __init__(self,
                  quantize: int,
                  num_states: int,
@@ -70,8 +70,8 @@ class Tabular(Agent):
             self.on_update(reward, last_state, last_action, next_state)
         self.on_episode_end()
         stats = {
-            "steps": len(reward_hist),
-            "total_reward": float(np.sum(reward_hist)),
+                "steps"       : len(reward_hist),
+                "total_reward": float(np.sum(reward_hist)),
         }
         return np.array(reward_hist, dtype=np.int32), stats
 

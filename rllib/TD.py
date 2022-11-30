@@ -3,19 +3,20 @@ import os
 
 import pathlib
 import numpy as np
+
 # print(os.getcwd())
 # print(os.path.dirname(__file__))
 # print(pathlib.Path(__file__).parent.parent.absolute())
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute()))
-from TabularAgent import Tabular
+from TabularAgent import TabularAgent
 from Environment import Environment
 from Experiment import Experiment
 from utils import logging_setup
 
 
-class TD(Tabular):
+class TD(TabularAgent):
     def __init__(self,
-                 algorithm:str,
+                 algorithm: str,
                  quantize: int,
                  num_states: int,
                  num_actions: int,
@@ -23,7 +24,7 @@ class TD(Tabular):
                  alpha: float = 0.1,
                  epsilon: float = 0.1):
         super().__init__(quantize, num_states, num_actions, gamma, alpha, epsilon)
-        self.alg:str = algorithm
+        self.alg: str = algorithm
         self.last_action = None
         self.last_state = None
 
@@ -57,16 +58,16 @@ class TD(Tabular):
         target_qsa = reward + self.gamma * next_qsa
         self.Q[idx] += self.alpha * (target_qsa - current_qsa)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     env = Environment(draw=False)
     agent = TD(
-        algorithm="Q-Learning",
-        quantize=8,
-        num_states=env.num_states,
-        num_actions=env.num_actions,
-        gamma=0.99,
-        alpha=0.1,
-        epsilon=0.1)
+            algorithm="Q-Learning",
+            quantize=8,
+            num_states=env.num_states,
+            num_actions=env.num_actions,
+            gamma=0.99,
+            alpha=0.1,
+            epsilon=0.1)
     exp = Experiment(env, agent)
     exp.run_experiment()

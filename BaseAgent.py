@@ -14,7 +14,7 @@ from NeuralNet import NeuralNet
 keras = tf.keras
 
 
-class Agent:
+class BaseAgent:
 
     def __init__(self, gamma: float = 0.97):
         self.gamma: float = gamma

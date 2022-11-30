@@ -8,13 +8,13 @@ import numpy as np
 # print(os.path.dirname(__file__))
 # print(pathlib.Path(__file__).parent.parent.absolute())
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute()))
-from TabularAgent import Tabular
+from TabularAgent import TabularAgent
 from Environment import Environment
 from Experiment import Experiment
 from utils import logging_setup
 
 
-class nStepTD(Tabular):
+class nStepTD(TabularAgent):
     def __init__(self,
                  n: int,
                  quantize: int,
@@ -24,8 +24,8 @@ class nStepTD(Tabular):
                  alpha: float = 0.1,
                  epsilon: float = 0.1):
         super().__init__(quantize, num_states, num_actions, gamma, alpha, epsilon)
-        self.actions:list = None
-        self.states:list = None
+        self.actions: list = None
+        self.states: list = None
         self.rewards: list = None
         self.t: int = None
         self.T: int = None
@@ -65,7 +65,7 @@ class nStepTD(Tabular):
         # if first step, initialize state and action history with first state and action
         # if self.t == 0:
         #     self.states.append(last_state)
-            # self.actions.append(last_action)
+        # self.actions.append(last_action)
         # print(self.t)
         if self.t < self.T:
             self.rewards.append(reward)
@@ -86,7 +86,7 @@ class nStepTD(Tabular):
             # calculate return from t to t-n
             G = 0
             for i in range(tau + 1, min(self.T, tau + self.n) + 1):
-                G += self.gamma ** (i - tau - 1) * self.rewards[i-1]
+                G += self.gamma ** (i - tau - 1) * self.rewards[i - 1]
 
             if tau + self.n < self.T:
                 state = self.bin_state(self.states[tau + self.n - 1]).flatten()
@@ -96,6 +96,8 @@ class nStepTD(Tabular):
             action = self.actions[tau - 1]
             self.Q[tuple(list(state.copy()) + [action])] += \
                 self.alpha * (G - self.Q[tuple(list(state.copy()) + [action])])
+
+
 """
 for _ in range(rounds):
     self.reset()
@@ -144,12 +146,12 @@ for _ in range(rounds):
 if __name__ == "__main__":
     env = Environment(draw=False)
     agent = nStepTD(
-        n=2,
-        quantize=8,
-        num_states=env.num_states,
-        num_actions=env.num_actions,
-        gamma=0.99,
-        alpha=0.1,
-        epsilon=0.1)
+            n=2,
+            quantize=8,
+            num_states=env.num_states,
+            num_actions=env.num_actions,
+            gamma=0.99,
+            alpha=0.1,
+            epsilon=0.1)
     exp = Experiment(env, agent)
     exp.run_experiment(max_episodes=1)

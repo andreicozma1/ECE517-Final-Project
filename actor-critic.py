@@ -10,7 +10,7 @@ import tensorflow_probability as tfp
 from Environment import Environment
 from Experiment import Experiment
 from NeuralNet import NeuralNet
-from Agent import Agent
+from BaseAgent import BaseAgent
 # This is a hacky fix for tensorflow imports to work with intellisense
 from rllib.utils import logging_setup
 
@@ -27,7 +27,7 @@ np.random.seed(seed)
 random.seed(seed)
 
 
-class A2CAgent(Agent):
+class A2CAgent(BaseAgent):
 
     def __init__(self, nn: NeuralNet, gamma: float = 0.97):
         super().__init__(gamma)
@@ -43,13 +43,11 @@ class A2CAgent(Agent):
         if self.nn.model is None:
             raise ValueError("Model is None")
         state = tf.reshape(state, self.nn.input_shape)
-        # Predict action probabilities and estimated future rewards from environment state
+
         action_logits_t, critic_value = self.nn.model(state)
         action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
         critic_value = tf.squeeze(critic_value)
 
-        # with probability 0.2, use deterministic action
-        # Sample next action from the action probability distribution
         # action = tfp.distributions.Categorical(logits=action_logits_t[0]).sample()
         action = tf.random.categorical(action_logits_t, 1)[0, 0]
         action_probs_t = tf.nn.softmax(action_logits_t)
