@@ -4,18 +4,18 @@ import pprint
 import tensorflow as tf
 import tensorflow_addons as tfa
 
-from CustomLayers import A2C
+from CustomLayers import A2C, ActorLoss, TransformerBlock
 
 keras = tf.keras
 
 
 class NeuralNet:
-    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.001, **kwargs):
+    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.0001, **kwargs):
         self.num_states: int = num_states
         self.num_actions: int = num_actions
         self.learning_rate: float = learning_rate
         self.input_shape = (1, 25, self.num_states)
-        self.model, self.optimizer, self.loss = self.create_model(name, **kwargs)
+        self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_model(name, **kwargs)
         logging.info(f"Models Args: {pprint.pformat(self.__dict__)}")
 
     def create_model(self, model_name: str, **kwargs):
@@ -45,40 +45,36 @@ class NeuralNet:
 
         ###################################################################
         # OPTIMIZER
-        optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
+        # optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=self.learning_rate)
         # optimizer = tfa.optimizers.AdamW(
         #         learning_rate=self.learning_rate, weight_decay=0.000005, amsgrad=True
         # )
-        # optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
+        optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
 
         ###################################################################
         # LOSS
-        loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
-        # loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
-        # loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM)
+        critic_loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
+        # critic_loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE, delta=0.5)
+        actor_loss = ActorLoss()
 
-        return model, optimizer, loss
+        return model, optimizer, critic_loss, actor_loss
 
     def inner_lstm(self, inputs, **kwargs):
-        embedding = keras.layers.Dense(128)(inputs)
-        embedding = keras.layers.LeakyReLU(alpha=0.05)(embedding)
-        embedding = keras.layers.Dense(256)(embedding)
-        embedding = keras.layers.LeakyReLU(alpha=0.05)(embedding)
-
-        sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(embedding)
+        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(inputs)
+        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(common)
         lstm = keras.layers.LSTM(128, return_sequences=False)(sequences)
-        lstm = keras.layers.Dropout(0.1)(lstm)
 
-        common = keras.layers.Dense(256)(lstm)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(256)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(256)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(128)(common)
+        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(lstm)
+        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
 
-        return common, common
+        actor = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        critic = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+
+        return actor, critic
 
     def inner_dense(self, inputs, **kwargs):
         common = keras.layers.Flatten()(inputs)

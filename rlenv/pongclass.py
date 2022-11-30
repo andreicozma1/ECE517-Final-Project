@@ -47,7 +47,7 @@ class pongGame:
 
     # returns all the parameters for the game (player location, computer location, x of ball, y of ball, x direction of ball, y direction of ball)
     def getState(self):
-        # return np.array([self.y1, self.xball, self.yball],
+        # return np.array([self.y1, self.xball, self.yball, self.last_action],
         #                 dtype=np.float32)
         # return np.array([self.y1, self.y2, self.xball, self.yball, self.ballHDirection, self.ballVDirection],
         #                 dtype=np.float32)
@@ -82,7 +82,7 @@ class pongGame:
             self.totalSpeed = self.totalSpeed + 0.2
             self.angle = ((math.pi / 4) * (self.yball - (self.y1 + self.paddle_length / 2)) / (self.paddle_length / 2))
             self.xball = 15
-            r += 1
+            r += 10
         elif (
                 self.yball > self.y2 and self.yball < self.y2 + self.paddle_length and self.xball > self.w - 15 and self.xball < self.w):
             self.totalSpeed = self.totalSpeed + 0.2

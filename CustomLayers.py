@@ -26,13 +26,22 @@ class A2C(keras.layers.Layer):
         return self.actor(actor_inputs), self.critic(critic_inputs)
 
 
+class ActorLoss(tf.keras.losses.Loss):
+    def __init__(self, name='actor_loss'):
+        super().__init__(name=name, reduction=tf.keras.losses.Reduction.NONE)
+
+    def call(self, advantage, action_probs):
+        action_log_probs = tf.math.log(action_probs)
+        return -tf.math.multiply(action_log_probs, advantage)
+
+
 class TransformerBlock(keras.layers.Layer):
     def __init__(self, embed_dim, num_heads, ff_dim, dropout_rate=0.1):
         super(TransformerBlock, self).__init__()
         self.embed_dim, self.num_heads, self.ff_dim, self.dropout_rate = embed_dim, num_heads, ff_dim, dropout_rate
         self.att = tfa.layers.MultiHeadAttention(head_size=embed_dim, num_heads=num_heads)
         self.ffn = keras.Sequential([*[keras.layers.Dense(ffd, activation="relu") for ffd in ff_dim],
-                                     keras.layers.Dense(embed_dim), ])
+                                     keras.layers.Dense(embed_dim)])
         self.layernorm1 = keras.layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2 = keras.layers.LayerNormalization(epsilon=1e-6)
         self.dropout1 = keras.layers.Dropout(dropout_rate)

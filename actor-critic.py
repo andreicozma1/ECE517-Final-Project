@@ -19,18 +19,19 @@ from rllib.utils import logging_setup
 log = logging_setup(file=__file__, name=__name__, level=logging.INFO)
 os.environ['WANDB_SILENT'] = "true"
 
-# Set seed for experiment reproducibility
-seed = 42
 
-tf.random.set_seed(seed)
-np.random.seed(seed)
-random.seed(seed)
+# Set seed for experiment reproducibility
+# seed = 42
+#
+# tf.random.set_seed(seed)
+# np.random.seed(seed)
+# random.seed(seed)
 
 
 class A2CAgent(BaseAgent):
 
     def __init__(self, nn: NeuralNet, gamma: float = 0.97):
-        super().__init__(gamma)
+        super().__init__(gamma=gamma)
         self.nn: NeuralNet = nn
         self.action_probs_hist = None
         self.critic_returns_hist = None
@@ -77,28 +78,27 @@ class A2CAgent(BaseAgent):
                      critic_returns: tf.Tensor,
                      actual_returns: tf.Tensor) -> tf.Tensor:
         """Computes the combined Actor-Critic loss."""
-        if self.nn.loss is None:
+        if self.nn.critic_loss is None:
             raise ValueError("Loss is None")
         # create multipliers for actor and critic losses
         actor_loss_multiplier = 1.0
         critic_loss_multiplier = 0.5
 
         advantage = tf.math.subtract(actual_returns, critic_returns)
-        # advantage = tf.square(advantage)
         # print(f"ARs: {actual_vals.shape} | CRs: {critic_vals.shape} | Adv: {advantage.shape}")
 
-        action_log_probs = -1 * tf.math.log(action_probs)
-        actor_losses = actor_loss_multiplier * tf.math.multiply(action_log_probs, advantage)
+        # action_log_probs = -1 * tf.math.log(action_probs)
+        # actor_losses = actor_loss_multiplier * tf.math.multiply(action_log_probs, advantage)
 
-        critic_losses = critic_loss_multiplier * self.nn.loss(critic_returns, actual_returns)
+        actor_losses = actor_loss_multiplier * self.nn.actor_loss(advantage, action_probs)
+
+        critic_losses = critic_loss_multiplier * self.nn.critic_loss(critic_returns, actual_returns)
         critic_losses = tf.reshape(critic_losses, shape=(tf.shape(actor_losses)))
 
         total_losses = actor_losses + critic_losses
-
         total_loss_sum = tf.math.reduce_sum(total_losses)
 
         self.plot_tr(action_probs, actor_losses, actual_returns, advantage, critic_losses, critic_returns, total_losses)
-
         return total_loss_sum
 
     def on_update(self, rewards, tape):
