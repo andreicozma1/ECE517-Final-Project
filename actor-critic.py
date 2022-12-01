@@ -81,8 +81,8 @@ class A2CAgent(BaseAgent):
         if self.nn.critic_loss is None:
             raise ValueError("Loss is None")
         # create multipliers for actor and critic losses
-        actor_loss_multiplier = 1.0
-        critic_loss_multiplier = 0.5
+        actor_loss_multiplier = 0.5
+        critic_loss_multiplier = 1.0
 
         advantage = tf.math.subtract(actual_returns, critic_returns)
         # print(f"ARs: {actual_vals.shape} | CRs: {critic_vals.shape} | Adv: {advantage.shape}")
@@ -117,16 +117,17 @@ class A2CAgent(BaseAgent):
         # Compute the gradients from the loss
         grads = tape.gradient(loss, self.nn.model.trainable_variables)
         # Pygame stopped responding fix
-        pygame.event.pump()
+        if self.env.draw:
+            pygame.event.pump()
         # Apply the gradients to the model's parameters
         self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
 
     def plot_tr(self, action_probs, actor_losses, actual_vals, advantage, critic_losses, critic_vals, total_losses):
-        plt.ion()
         # network_state = self.network_state_hist.stack()
         # network_state = tf.squeeze(network_state)
         # network_state = tf.transpose(network_state)
         # plt.imshow(network_state)
+        plt.clf()
         plt.plot(tf.squeeze(action_probs), label='Actor Probs', color='steelblue')
         plt.plot(tf.squeeze(actor_losses), label='Actor Loss', color="lightskyblue")
         plt.plot(tf.squeeze(critic_losses), label='Critic Loss', color='salmon')
@@ -146,11 +147,12 @@ class A2CAgent(BaseAgent):
         plt.grid(color='lightgray', linestyle='--', linewidth=0.5)
         plt.tight_layout()
         plt.legend(loc='lower left')
-        plt.show()
+        plt.draw()
+        plt.savefig('tr.pdf')
 
 
 def main():
-    env = PongEnvironment(draw=True)
+    env = PongEnvironment(draw=False)
     nn = NeuralNet("lstm", env.num_states, env.num_actions)
     agent = A2CAgent(nn)
 

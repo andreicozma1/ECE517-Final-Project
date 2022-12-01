@@ -64,15 +64,22 @@ class NeuralNet:
         common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(inputs)
         common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
         common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+
         sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(common)
+        sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(sequences)
+        sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(sequences)
+
         lstm = keras.layers.LSTM(128, return_sequences=False)(sequences)
 
-        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(lstm)
-        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
-        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        common = keras.layers.Dropout(0.5)(lstm)
 
         actor = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        actor = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(actor)
+        actor = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(actor)
+
         critic = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        critic = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(critic)
+        critic = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(critic)
 
         return actor, critic
 

@@ -17,6 +17,7 @@ keras = tf.keras
 class BaseAgent:
 
     def __init__(self, gamma: float = 0.97):
+        self.env = None
         self.gamma: float = gamma
         logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 
@@ -47,6 +48,7 @@ class BaseAgent:
         return returns
 
     def run_episode(self, env: PongEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor, dict]:
+        self.env = env
         self.on_episode_start()
         reward_hist = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
 
@@ -86,8 +88,7 @@ class BaseAgent:
 
     # @tf.function
     def train_step(self, env: PongEnvironment, max_steps_per_episode: int) -> dict:
-        """Runs a model training step."""
-
+        self.env = env
         with tf.GradientTape() as tape:
             # Run the model for one episode to collect training data
             rewards, stats = self.run_episode(env, max_steps_per_episode, deterministic=False)
