@@ -7,7 +7,7 @@ from typing import Any, List, Tuple
 import gymnasium
 import numpy as np
 import tensorflow as tf
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import joblib
 from rlenv import pongGame
 
@@ -37,7 +37,8 @@ class BaseEnvironment:
 
     def reset_scaler(self):
         logging.warning("Creating new state scaler")
-        self.state_scaler = MinMaxScaler(feature_range=(-1, 1))
+        # self.state_scaler = MinMaxScaler(feature_range=(-1, 1))
+        self.state_scaler = StandardScaler()
 
     def scale_state(self, state):
         state = state.reshape(1, self.num_states)
@@ -94,11 +95,8 @@ class PongEnvironment(BaseEnvironment):
 
 class LunarLander(BaseEnvironment):
     def __init__(self, draw=False, draw_speed=None):
-        self.draw = draw
-        self.draw_speed = draw_speed
+        self.draw, self.draw_speed = draw, draw_speed
         self._env = gymnasium.make("LunarLander-v2", render_mode="human" if draw else "none")
-        num_states, num_actions = self._env.observation_space, self._env.action_space
-        print(num_states, num_actions)
         num_states, num_actions = self._env.observation_space.shape[0], self._env.action_space.n
         super().__init__(name='LunarLander', num_states=num_states, num_actions=num_actions)
 

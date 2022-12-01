@@ -66,13 +66,13 @@ class NeuralNet:
         return model, optimizer, critic_loss, actor_loss
 
     def inner_lstm(self, inputs, **kwargs):
-        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(inputs)
-        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
-        common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        common = keras.layers.Dense(256, activation="elu", kernel_initializer="he_uniform")(inputs)
+        # common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+        # common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
 
         sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(common)
-        sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(sequences)
-        sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(sequences)
+        # sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(sequences)
+        # sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(sequences)
 
         lstm = keras.layers.LSTM(128, return_sequences=False)(sequences)
 

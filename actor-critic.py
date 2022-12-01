@@ -53,7 +53,7 @@ class A2CAgent(BaseAgent):
         state = self.state.stack()
         state = state[-self.nn.max_timesteps:, :]
         state = tf.reshape(state, self.nn.input_shape)
-        # logging.debug(f"state: {state} \t shape: {state.shape}")
+        logging.info(f"state: {state} \t shape: {state.shape}")
 
         action_logits_t, critic_value = self.nn.model(state)
         # logging.debug(f"action_logits_t: {action_logits_t} | critic_value: {critic_value}")
@@ -206,7 +206,8 @@ class A2CAgent(BaseAgent):
 
 def main():
     # env = PongEnvironment(draw=True, draw_speed=1)
-    env = LunarLander(draw=True, draw_speed=None)
+    env = PongEnvironment(draw=True, draw_speed=None)
+    # env = LunarLander(draw=True, draw_speed=None)
     nn = NeuralNet("lstm", env.num_states, env.num_actions, max_timesteps=5, learning_rate=0.0001)
     agent = A2CAgent(nn, gamma=0.99)
 
