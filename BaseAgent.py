@@ -54,8 +54,7 @@ class BaseAgent:
         self.on_episode_start()
         reward_hist = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
 
-        state = env.reset()
-        win = False
+        state, reward, done, win = env.reset(), None, False, False
         initial_state_shape = state.shape
 
         tq = tqdm(tf.range(max_steps), desc=f"Ep. {self.global_episode:>6}", leave=False)
