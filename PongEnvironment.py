@@ -101,7 +101,6 @@ class LunarLander(BaseEnvironment):
         print(num_states, num_actions)
         num_states, num_actions = self._env.observation_space.shape[0], self._env.action_space.n
         super().__init__(name='LunarLander', num_states=num_states, num_actions=num_actions)
-        logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 
     def _step(self, action: np.ndarray) -> Tuple[Any, float, bool]:
         state, reward, terminated, truncated, _ = self._env.step(action)
