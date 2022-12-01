@@ -4,7 +4,7 @@ import os
 import numpy as np
 import pygame
 import tensorflow as tf
-from PongEnvironment import PongEnvironment
+from PongEnvironment import LunarLander, PongEnvironment
 from Experiment import Experiment
 from NeuralNet import NeuralNet
 from BaseAgent import BaseAgent
@@ -177,8 +177,8 @@ class A2CAgent(BaseAgent):
                 ],
         }
 
-        # PlotHelper.plot_from_dict(plot_losses, savefig="plots/a2c_losses.pdf")
-        # PlotHelper.plot_from_dict(plot_returns, savefig="plots/a2c_returns.pdf")
+        PlotHelper.plot_from_dict(plot_losses, savefig="plots/a2c_losses.pdf")
+        PlotHelper.plot_from_dict(plot_returns, savefig="plots/a2c_returns.pdf")
 
         return total_loss_sum
 
@@ -197,16 +197,16 @@ class A2CAgent(BaseAgent):
 
         # Compute the gradients from the loss
         grads = tape.gradient(loss, self.nn.model.trainable_variables)
-        # Pygame stopped responding fix
-        if self.env.draw:
-            pygame.event.pump()
+        # # Pygame stopped responding fix
+        # if self.env.draw:
+        #     pygame.event.pump()
         # Apply the gradients to the model's parameters
         self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
 
 
 def main():
     # env = PongEnvironment(draw=True, draw_speed=1)
-    env = PongEnvironment(draw=True, draw_speed=None)
+    env = LunarLander(draw=True, draw_speed=None)
     nn = NeuralNet("lstm", env.num_states, env.num_actions, max_timesteps=5, learning_rate=0.0001)
     agent = A2CAgent(nn, gamma=0.99)
 

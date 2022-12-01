@@ -9,7 +9,7 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
-from PongEnvironment import PongEnvironment
+from PongEnvironment import BaseEnvironment, PongEnvironment
 from NeuralNet import NeuralNet
 
 keras = tf.keras
@@ -49,18 +49,18 @@ class BaseAgent:
         # returns = tf.math.divide(returns, tf.math.reduce_max(returns))
         return returns
 
-    def run_episode(self, env: PongEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor, dict]:
+    def run_episode(self, env: BaseEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor, dict]:
         self.env = env
         self.on_episode_start()
         reward_hist = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
 
-        state, reward, done, win = env.reset(), None, False, False
+        state, reward, done = env.reset(), None, False
         initial_state_shape = state.shape
 
         tq = tqdm(tf.range(max_steps), desc=f"Ep. {self.global_episode:>6}", leave=False)
         for t in tq:
             action = self.get_action(t, state)
-            state, reward, done, win = env.tf_step(action)
+            state, reward, done = env.tf_step(action)
             state.set_shape(initial_state_shape)
 
             tq.set_postfix({
@@ -78,7 +78,6 @@ class BaseAgent:
         stats = {
                 "steps"       : len(reward_hist.numpy()),
                 "total_reward": float(tf.math.reduce_sum(reward_hist)),
-                "win"         : win,
         }
         return reward_hist, stats
 
@@ -95,7 +94,7 @@ class BaseAgent:
         pass
 
     # @tf.function
-    def train_step(self, env: PongEnvironment, max_steps_per_episode: int) -> dict:
+    def train_step(self, env: BaseEnvironment, max_steps_per_episode: int) -> dict:
         self.env = env
         with tf.GradientTape() as tape:
             rewards, stats = self.run_episode(env, max_steps_per_episode, deterministic=False)

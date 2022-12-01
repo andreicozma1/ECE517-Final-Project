@@ -1,3 +1,4 @@
+import sys
 import time
 
 import pygame
@@ -12,18 +13,18 @@ PI_4 = math.pi / 4
 # pong game class
 class pongGame:
     # initializing parameters
-    def __init__(self, h, w, draw=True, draw_speed: Union[float, None] = None):
+    def __init__(self, w, h, draw=True, draw_speed: Union[float, None] = None):
         self.win_w, self.win_h = w, h
         self.draw_enabled, self.draw_speed = draw, draw_speed
         ####################################################################
         # Paddle width and height
-        self.p_w, self.p_h = 10, self.win_h / 6
+        self.p_w, self.p_h = self.win_w // 30, self.win_h // 6
         # Distance from edge of screen to paddle
-        self.p_dist_edge = 5
+        self.p_dist_edge = self.p_w // 2
         # Collision distance for ball from paddle
         self.p_coll_dist = self.p_w + self.p_dist_edge
         # Paddle movement speed
-        self.p_vel = 5
+        self.p_vel = self.win_h // 40
 
         ####################################################################
         self.p1_y, self.p2_y = None, None
@@ -169,3 +170,32 @@ class pongGame:
                            (self.b_x, self.b_y), 5)  # ((x, y), radius)
         # update the display
         pygame.display.flip()
+        pygame.event.pump()
+
+
+def main():
+    # Initialize the game
+    game = pongGame(200, 200, draw=True, draw_speed=0.01)
+    t = 0
+    while True:
+        # Let the player play the game with the arrow keys
+        keys = pygame.key.get_pressed()
+        action = 2
+        if keys[pygame.K_UP]:
+            action = 0
+        elif keys[pygame.K_DOWN]:
+            action = 1
+        print(f"{t}: {action}")
+        # Take a step in the game
+        reward = game.takeAction(action)
+        # Check if the game is over
+        if reward in [100, -100]:
+            # Reset the game
+            game.reset()
+            t = 0
+            continue
+        t += 1
+
+
+if __name__ == "__main__":
+    main()
