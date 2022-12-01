@@ -2,7 +2,7 @@ import abc
 import logging
 import os
 import pprint
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 import gymnasium
 import numpy as np
@@ -33,6 +33,8 @@ class BaseEnvironment:
         else:
             self.reset_scaler()
 
+        logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
+
     def reset_scaler(self):
         logging.warning("Creating new state scaler")
         self.state_scaler = MinMaxScaler(feature_range=(-1, 1))
@@ -51,12 +53,23 @@ class BaseEnvironment:
                                  [tf.float32, tf.int32, tf.bool])
 
     @abc.abstractmethod
-    def step(self, action) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _step(self, action) -> Tuple[Any, float, bool]:
         pass
 
+    def step(self, action) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        state, reward, done = self._step(action)
+        state = self.scale_state(state)
+        return state.astype(np.float32), np.array(reward, np.float32), np.array(done, np.bool)
+
     @abc.abstractmethod
-    def reset(self) -> np.ndarray:
+    def _reset(self) -> np.ndarray:
         pass
+
+    def reset(self) -> np.ndarray:
+        state = self._reset()
+        state = self.scale_state(state)
+        joblib.dump(self.state_scaler, self.save_path_env_scaler)
+        return state
 
 
 class PongEnvironment(BaseEnvironment):
@@ -64,16 +77,14 @@ class PongEnvironment(BaseEnvironment):
         self._game = pongGame(200, 200, draw=draw, draw_speed=draw_speed)
         num_states, num_actions = self._game.getState().shape[0], 3
         super().__init__(name='Pong', num_states=num_states, num_actions=num_actions)
-        logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Returns state, reward and done flag given an action."""
+    def _step(self, action: np.ndarray) -> Tuple[Any, float, bool]:
         reward = self._game.takeAction(action)
         done = reward in [-100, 100]
-        state = self.scale_state(self._game.getState())
-        return state.astype(np.float32), np.array(reward, np.int32), np.array(done, np.bool)
+        state = self._game.getState()
+        return state, reward, done
 
-    def reset(self):
+    def _reset(self):
         self._game.reset()
         state = self._game.getState()
         state = self.scale_state(state)
@@ -92,15 +103,12 @@ class LunarLander(BaseEnvironment):
         super().__init__(name='LunarLander', num_states=num_states, num_actions=num_actions)
         logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Returns state, reward and done flag given an action."""
+    def _step(self, action: np.ndarray) -> Tuple[Any, float, bool]:
         state, reward, terminated, truncated, _ = self._env.step(action)
         state = self.scale_state(state)
         done = terminated or truncated
-        return state.astype(np.float32), np.array(reward, np.int32), np.array(done, np.bool)
+        return state, reward, done
 
-    def reset(self):
+    def _reset(self):
         state, _ = self._env.reset()
-        state = self.scale_state(state)
-        joblib.dump(self.state_scaler, self.save_path_env_scaler)
         return state

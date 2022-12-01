@@ -20,8 +20,8 @@ class BaseAgent:
     def __init__(self, gamma: float):
         self.env = None
         self.gamma: float = gamma
-        logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
         self.global_episode = 0
+        logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 
     def get_expected_return(self,
                             rewards: tf.Tensor) -> tf.Tensor:
@@ -52,7 +52,7 @@ class BaseAgent:
     def run_episode(self, env: BaseEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor, dict]:
         self.env = env
         self.on_episode_start()
-        reward_hist = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
+        reward_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
         state, reward, done = env.reset(), None, False
         initial_state_shape = state.shape
