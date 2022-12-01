@@ -21,7 +21,7 @@ class NeuralNet:
         self.max_timesteps: int = max_timesteps
         self.input_shape = (1, self.max_timesteps, self.num_features)
         self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_model(name, **kwargs)
-        logging.info(f"Models Args: {pprint.pformat(self.__dict__)}")
+        logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def create_model(self, model_name: str, **kwargs):
         logging.info(f"Model: {model_name}")

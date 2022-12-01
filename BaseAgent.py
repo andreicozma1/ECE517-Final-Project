@@ -18,10 +18,16 @@ keras = tf.keras
 class BaseAgent:
 
     def __init__(self, gamma: float):
-        self.env = None
+        self.env: BaseEnvironment = None
         self.gamma: float = gamma
-        self.global_episode = 0
-        logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
+        self.global_episode: int = 0
+        logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
+
+    @property
+    def save_path(self):
+        if self.env is None:
+            raise ValueError("Environment not set")
+        return self.env.save_path_env
 
     def get_expected_return(self,
                             rewards: tf.Tensor) -> tf.Tensor:
@@ -50,7 +56,7 @@ class BaseAgent:
         return returns
 
     def run_episode(self, env: BaseEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor, dict]:
-        self.env = env
+        self.env: BaseEnvironment = env
         self.on_episode_start()
         reward_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
@@ -75,7 +81,7 @@ class BaseAgent:
         reward_hist = reward_hist.stack()
         self.on_episode_end()
 
-        stats = {
+        stats: dict = {
                 "steps"       : len(reward_hist.numpy()),
                 "total_reward": float(tf.math.reduce_sum(reward_hist)),
         }
@@ -95,7 +101,7 @@ class BaseAgent:
 
     # @tf.function
     def train_step(self, env: BaseEnvironment, max_steps_per_episode: int) -> dict:
-        self.env = env
+        self.env: BaseEnvironment = env
         with tf.GradientTape() as tape:
             rewards, stats = self.run_episode(env, max_steps_per_episode, deterministic=False)
             self.on_update(rewards, tape)

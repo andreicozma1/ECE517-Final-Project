@@ -21,26 +21,28 @@ class BaseEnvironment:
         self.name: str = name
         self.num_states: int = num_states
         self.num_actions: int = num_actions
-
-        self.save_path_base: str = base_folder
-        self.save_path_env = os.path.join(self.save_path_base, self.name)
+        self.save_path_root: str = base_folder
+        self.save_path_env: str = os.path.join(self.save_path_root, self.name)
         os.makedirs(self.save_path_env, exist_ok=True)
-        self.save_path_env_scaler = os.path.join(self.save_path_env, "state_scaler.pkl")
 
+        self.state_scaler, self.save_path_env_scaler = None, os.path.join(self.save_path_env, "state_scaler.pkl")
+        self.load_scaler()
+
+        logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
+
+    def load_scaler(self):
         if os.path.isfile(self.save_path_env_scaler):
             logging.info(f"Loading state scaler from {self.save_path_env_scaler}")
             self.state_scaler = joblib.load(self.save_path_env_scaler)
         else:
             self.reset_scaler()
 
-        logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
-
     def reset_scaler(self):
         logging.warning("Creating new state scaler")
         # self.state_scaler = MinMaxScaler(feature_range=(-1, 1))
         self.state_scaler = StandardScaler()
 
-    def scale_state(self, state):
+    def transform_state(self, state):
         state = state.reshape(1, self.num_states)
         try:
             self.state_scaler.partial_fit(state)
@@ -59,7 +61,7 @@ class BaseEnvironment:
 
     def step(self, action) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         state, reward, done = self._step(action)
-        state = self.scale_state(state)
+        state = self.transform_state(state)
         return state.astype(np.float32), np.array(reward, np.float32), np.array(done, np.bool)
 
     @abc.abstractmethod
@@ -68,7 +70,7 @@ class BaseEnvironment:
 
     def reset(self) -> np.ndarray:
         state = self._reset()
-        state = self.scale_state(state)
+        state = self.transform_state(state)
         joblib.dump(self.state_scaler, self.save_path_env_scaler)
         return state
 
@@ -87,10 +89,7 @@ class PongEnvironment(BaseEnvironment):
 
     def _reset(self):
         self._game.reset()
-        state = self._game.getState()
-        state = self.scale_state(state)
-        joblib.dump(self.state_scaler, self.save_path_env_scaler)
-        return state
+        return self._game.getState()
 
 
 class LunarLander(BaseEnvironment):
@@ -102,7 +101,6 @@ class LunarLander(BaseEnvironment):
 
     def _step(self, action: np.ndarray) -> Tuple[Any, float, bool]:
         state, reward, terminated, truncated, _ = self._env.step(action)
-        state = self.scale_state(state)
         done = terminated or truncated
         return state, reward, done
 

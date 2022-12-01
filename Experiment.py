@@ -15,7 +15,7 @@ class Experiment:
         super().__init__()
         self.env: BaseEnvironment = env
         self.agent: BaseAgent = agent
-        logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
+        logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def run_experiment(self,
                        min_episodes_criterion=25,

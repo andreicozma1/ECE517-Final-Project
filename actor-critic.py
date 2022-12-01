@@ -53,7 +53,7 @@ class A2CAgent(BaseAgent):
         state = self.state.stack()
         state = state[-self.nn.max_timesteps:, :]
         state = tf.reshape(state, self.nn.input_shape)
-        logging.info(f"state: {state} \t shape: {state.shape}")
+        # logging.info(f"state: {state} \t shape: {state.shape}")
 
         action_logits_t, critic_value = self.nn.model(state)
         # logging.debug(f"action_logits_t: {action_logits_t} | critic_value: {critic_value}")
@@ -88,6 +88,8 @@ class A2CAgent(BaseAgent):
         actor_loss_multiplier = 0.5
         critic_loss_multiplier = 1.0
 
+        # If action is better than average, the advantage function is positive,
+        # if worse, it is negative.
         advantage = tf.math.subtract(actual_returns, critic_returns)
         # print(f"ARs: {actual_vals.shape} | CRs: {critic_vals.shape} | Adv: {advantage.shape}")
 
