@@ -17,7 +17,7 @@ class BaseEnvironment:
     def __init__(self, name: str,
                  num_states: int,
                  num_actions: int,
-                 base_folder="./saves/environment/"):
+                 base_folder="./saves/"):
         self.name: str = name
         self.num_states: int = num_states
         self.num_actions: int = num_actions
