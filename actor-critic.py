@@ -1,17 +1,15 @@
 import logging
 import os
-import random
 
 import numpy as np
 import pygame
 import tensorflow as tf
-from matplotlib import pyplot as plt
-import tensorflow_probability as tfp
 from PongEnvironment import PongEnvironment
 from Experiment import Experiment
 from NeuralNet import NeuralNet
 from BaseAgent import BaseAgent
 # This is a hacky fix for tensorflow imports to work with intellisense
+from rllib.PlotHelper import PlotHelper
 from rllib.utils import logging_setup
 
 # Logging to stdout and file with logging class
@@ -98,7 +96,84 @@ class A2CAgent(BaseAgent):
         total_losses = actor_losses + critic_losses
         total_loss_sum = tf.math.reduce_sum(total_losses)
 
-        self.plot_tr(action_probs, actor_losses, actual_returns, advantage, critic_losses, critic_returns, total_losses)
+        plot_returns = {
+                "plot"        : [
+                        {
+                                "args" : [tf.squeeze(critic_returns).numpy()],
+                                "label": "Critic Val",
+                                "color": "red"
+                        },
+                        {
+                                "args" : [tf.squeeze(actual_returns).numpy()],
+                                "label": "Actual Val",
+                                "color": "green"
+                        },
+                        {
+                                "args" : [tf.squeeze(advantage).numpy()],
+                                "label": "Advantage",
+                                "color": "purple"
+                        }
+                ],
+                "fill_between": [
+                        {
+                                "args" : [tf.range(tf.shape(actual_returns)[0]), tf.squeeze(actual_returns),
+                                          tf.squeeze(critic_returns)],
+                                "where": tf.squeeze(actual_returns) > tf.squeeze(critic_returns),
+                                "color": "green",
+                                "alpha": 0.15
+                        },
+                        {
+                                "args" : [tf.range(tf.shape(actual_returns)[0]), tf.squeeze(actual_returns),
+                                          tf.squeeze(critic_returns)],
+                                "where": tf.squeeze(actual_returns) < tf.squeeze(critic_returns),
+                                "color": "red",
+                                "alpha": 0.15
+                        }
+                ],
+                "axhline"     : [
+                        {
+                                "y"        : 0,
+                                "color"    : "black",
+                                "linestyle": "--"
+                        }
+                ],
+        }
+        plot_losses = {
+                "plot"   : [
+                        {
+                                "args" : [tf.squeeze(action_probs).numpy()],
+                                "label": "Actor Probs",
+                                "color": "steelblue"
+                        },
+                        {
+                                "args" : [tf.squeeze(actor_losses).numpy()],
+                                "label": "Actor Loss",
+                                "color": "lightskyblue"
+                        },
+                        {
+                                "args" : [tf.squeeze(critic_losses).numpy()],
+                                "label": "Critic Loss",
+                                "color": "salmon"
+                        },
+                        {
+                                "args" : [tf.squeeze(total_losses).numpy()],
+                                "label": "Total Loss",
+                                "color": "black"
+                        },
+
+                ],
+                "axhline": [
+                        {
+                                "y"        : 0,
+                                "color"    : "black",
+                                "linestyle": "--"
+                        }
+                ],
+        }
+
+        PlotHelper.plot_from_dict(plot_losses, savefig="plots/a2c_losses.pdf")
+        PlotHelper.plot_from_dict(plot_returns, savefig="plots/a2c_returns.pdf")
+
         return total_loss_sum
 
     def on_update(self, rewards, tape):
@@ -121,34 +196,6 @@ class A2CAgent(BaseAgent):
             pygame.event.pump()
         # Apply the gradients to the model's parameters
         self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
-
-    def plot_tr(self, action_probs, actor_losses, actual_vals, advantage, critic_losses, critic_vals, total_losses):
-        # network_state = self.network_state_hist.stack()
-        # network_state = tf.squeeze(network_state)
-        # network_state = tf.transpose(network_state)
-        # plt.imshow(network_state)
-        plt.clf()
-        plt.plot(tf.squeeze(action_probs), label='Actor Probs', color='steelblue')
-        plt.plot(tf.squeeze(actor_losses), label='Actor Loss', color="lightskyblue")
-        plt.plot(tf.squeeze(critic_losses), label='Critic Loss', color='salmon')
-        plt.plot(tf.squeeze(total_losses), label='Total Loss', color='black')
-        plt.plot(tf.squeeze(critic_vals), label='Critic Val', color='red')
-        plt.plot(tf.squeeze(actual_vals), label='Actual Val', color="green")
-        plt.plot(tf.squeeze(advantage), label='Advantage', color='purple')
-
-        plt.fill_between(tf.range(tf.shape(actual_vals)[0]), tf.squeeze(actual_vals), tf.squeeze(critic_vals),
-                         where=tf.squeeze(actual_vals) > tf.squeeze(critic_vals), color='green', alpha=0.15)
-        plt.fill_between(tf.range(tf.shape(actual_vals)[0]), tf.squeeze(actual_vals), tf.squeeze(critic_vals),
-                         where=tf.squeeze(actual_vals) < tf.squeeze(critic_vals), color='red', alpha=0.15)
-
-        plt.axhline(y=0, color='black', linestyle='--')
-
-        plt.ylim(-5, 2)
-        plt.grid(color='lightgray', linestyle='--', linewidth=0.5)
-        plt.tight_layout()
-        plt.legend(loc='lower left')
-        plt.draw()
-        plt.savefig('tr.pdf')
 
 
 def main():
