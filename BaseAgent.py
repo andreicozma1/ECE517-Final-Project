@@ -16,7 +16,7 @@ keras = tf.keras
 
 class BaseAgent:
 
-    def __init__(self, gamma: float = 0.97):
+    def __init__(self, gamma: float):
         self.env = None
         self.gamma: float = gamma
         logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
@@ -90,9 +90,7 @@ class BaseAgent:
     def train_step(self, env: PongEnvironment, max_steps_per_episode: int) -> dict:
         self.env = env
         with tf.GradientTape() as tape:
-            # Run the model for one episode to collect training data
             rewards, stats = self.run_episode(env, max_steps_per_episode, deterministic=False)
-
             self.on_update(rewards, tape)
 
         return stats

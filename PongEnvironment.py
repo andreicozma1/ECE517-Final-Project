@@ -19,7 +19,7 @@ class PongEnvironment:
         logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
 
     def get_state(self):
-        state = self.game.getState().reshape(1, -1)
+        state = self.game.getState().reshape(1, self.num_states)
         self.state_scaler.partial_fit(state)
         state = self.state_scaler.transform(state)
         return state

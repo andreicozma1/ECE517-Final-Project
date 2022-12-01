@@ -34,24 +34,34 @@ class A2CAgent(BaseAgent):
         self.action_probs_hist = None
         self.critic_returns_hist = None
         self.state = None
-        self.num_timesteps = self.nn.input_shape[1]
 
     def on_episode_start(self):
         self.action_probs_hist = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
         self.critic_returns_hist = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
-        self.state = np.zeros(self.nn.input_shape)
+        # tensorflow collection of self.nn.input_shape[1] zeros
+        self.state = tf.TensorArray(tf.float32, size=self.nn.max_timesteps, dynamic_size=False)
+
+    def add_to_history(self, t, state_t):
+        self.state = self.state.write(t, tf.reshape(state_t, self.nn.num_features))
+        # if longer than max_timesteps, remove the first element
+        if self.state.size() > self.nn.max_timesteps:
+            self.state = self.state.gather(tf.range(1, self.state.size()))
 
     def get_action(self, t, state_t):
         if self.nn.model is None:
             raise ValueError("Model is None")
         # state = tf.reshape(state, self.nn.input_shape)
-        state_t = np.expand_dims(state_t, axis=0)
-        self.state = np.append(self.state, state_t, axis=1)
-        self.state = self.state[:, -self.num_timesteps:, :]
-
+        # state_t = np.expand_dims(state_t, axis=0)
+        # self.state = np.append(self.state, state_t, axis=1)
+        # self.state = self.state[:, -self.num_timesteps:, :]
+        state = self.state.stack()[::-1]
+        print("State: ", state)
+        self.add_to_history(t, state_t)
+        state = self.state.stack()[::-1]
+        print("State: ", state)
         # print("State: ", self.state)
         # print("State shape: ", self.state.shape)
-        action_logits_t, critic_value = self.nn.model(self.state)
+        action_logits_t, critic_value = self.nn.model(state)
         # print(f"Logits: {action_logits_t} | Critic Value: {critic_value}")
 
         action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
@@ -99,17 +109,17 @@ class A2CAgent(BaseAgent):
         plot_returns = {
                 "plot"        : [
                         {
-                                "args" : [tf.squeeze(critic_returns).numpy()],
+                                "args" : [tf.squeeze(critic_returns)],
                                 "label": "Critic Val",
                                 "color": "red"
                         },
                         {
-                                "args" : [tf.squeeze(actual_returns).numpy()],
+                                "args" : [tf.squeeze(actual_returns)],
                                 "label": "Actual Val",
                                 "color": "green"
                         },
                         {
-                                "args" : [tf.squeeze(advantage).numpy()],
+                                "args" : [tf.squeeze(advantage)],
                                 "label": "Advantage",
                                 "color": "purple"
                         }
@@ -141,22 +151,22 @@ class A2CAgent(BaseAgent):
         plot_losses = {
                 "plot"   : [
                         {
-                                "args" : [tf.squeeze(action_probs).numpy()],
+                                "args" : [tf.squeeze(action_probs)],
                                 "label": "Actor Probs",
                                 "color": "steelblue"
                         },
                         {
-                                "args" : [tf.squeeze(actor_losses).numpy()],
+                                "args" : [tf.squeeze(actor_losses)],
                                 "label": "Actor Loss",
                                 "color": "lightskyblue"
                         },
                         {
-                                "args" : [tf.squeeze(critic_losses).numpy()],
+                                "args" : [tf.squeeze(critic_losses)],
                                 "label": "Critic Loss",
                                 "color": "salmon"
                         },
                         {
-                                "args" : [tf.squeeze(total_losses).numpy()],
+                                "args" : [tf.squeeze(total_losses)],
                                 "label": "Total Loss",
                                 "color": "black"
                         },
@@ -171,8 +181,8 @@ class A2CAgent(BaseAgent):
                 ],
         }
 
-        PlotHelper.plot_from_dict(plot_losses, savefig="plots/a2c_losses.pdf")
-        PlotHelper.plot_from_dict(plot_returns, savefig="plots/a2c_returns.pdf")
+        # PlotHelper.plot_from_dict(plot_losses, savefig="plots/a2c_losses.pdf")
+        # PlotHelper.plot_from_dict(plot_returns, savefig="plots/a2c_returns.pdf")
 
         return total_loss_sum
 
@@ -200,7 +210,7 @@ class A2CAgent(BaseAgent):
 
 def main():
     env = PongEnvironment(draw=False)
-    nn = NeuralNet("lstm", env.num_states, env.num_actions)
+    nn = NeuralNet("lstm", env.num_states, env.num_actions, max_timesteps=25, learning_rate=0.0001)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent)

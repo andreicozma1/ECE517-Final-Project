@@ -10,11 +10,16 @@ keras = tf.keras
 
 
 class NeuralNet:
-    def __init__(self, name: str, num_states: int, num_actions: int, learning_rate: float = 0.0001, **kwargs):
-        self.num_states: int = num_states
+    def __init__(self, name: str, num_states: int, num_actions: int,
+                 max_timesteps: int = 1,
+                 learning_rate: float = 0.0001,
+                 **kwargs):
+        self.name: str = name
+        self.num_features: int = num_states
         self.num_actions: int = num_actions
         self.learning_rate: float = learning_rate
-        self.input_shape = (1, 25, self.num_states)
+        self.max_timesteps: int = max_timesteps
+        self.input_shape = (1, self.max_timesteps, self.num_features)
         self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_model(name, **kwargs)
         logging.info(f"Models Args: {pprint.pformat(self.__dict__)}")
 
