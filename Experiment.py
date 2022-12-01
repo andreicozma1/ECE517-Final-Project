@@ -1,6 +1,7 @@
 import collections
 import logging
 import pprint
+from math import inf
 
 import numpy as np
 import tqdm
@@ -22,21 +23,23 @@ class Experiment:
                        max_steps_per_episode=2500,
                        use_wandb: bool = True):
         # self.init_experiment(training, use_wandb=use_wandb)
-
         stats = {}
         episodes_reward: collections.deque = collections.deque(maxlen=min_episodes_criterion)
-        tq = tqdm.trange(max_episodes)
-        for ep in tq:
+
+        tq = tqdm.trange(max_episodes, desc="Experiment", leave=True)
+        for _ in tq:
             episode_stats = self.agent.train_step(self.env, max_steps_per_episode)
 
             episodes_reward.append(episode_stats["total_reward"])
-            stats.update({
-                    "episode"       : ep,
+            stats |= {
                     "running_reward": np.mean(episodes_reward),
+                    "max_steps"     : max(stats.get("max_steps", 0), episode_stats["steps"]),
+                    "max_reward"    : max(stats.get("max_reward", -inf), episode_stats["total_reward"]),
+                    "min_reward"    : min(stats.get("min_reward", inf), episode_stats["total_reward"]),
                     **episode_stats
-            })
+            }
+
+            # if use_wandb:
             # wandb.log(stats)
 
-            tq.set_postfix(episode_reward=stats['total_reward'],
-                           running_reward=stats['running_reward'],
-                           steps=stats['steps'])
+            tq.set_postfix(stats)

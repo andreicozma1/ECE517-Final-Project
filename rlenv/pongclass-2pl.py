@@ -131,7 +131,9 @@ class pongGame:
         # return reward
         return p1_r, p2_r
 
-    # a function to draw the actual game frame. If called it is probably best to use a delay between frames (for example time.sleep(0.03) for about 30 frames per second.
+    # a function to draw the actual game frame.
+    # If called it is probably best to use a delay between frames
+    # (for example time.sleep(0.03) for about 30 frames per second.
     def draw(self):
         if not self.should_draw:
             return
@@ -144,10 +146,20 @@ class pongGame:
         paddle_distance = 5
 
         # draw the scene
-        pygame.draw.rect(self.window, (255, 255, 255), (paddle_distance, self.y1,
-                                                        paddle_width, self.paddle_length))
-        pygame.draw.rect(self.window, (255, 255, 255), (self.w - paddle_width - paddle_distance, self.y2,
-                                                        paddle_width, self.paddle_length))
-        pygame.draw.circle(self.window, (255, 255, 255), (self.xball, self.yball), 5)
+        pygame.draw.rect(self.window,
+                         (255, 255, 255),
+                         (paddle_distance,  # x
+                          self.y1,  # y
+                          paddle_width,  # width
+                          self.paddle_length))  # height
+        pygame.draw.rect(self.window,
+                         (255, 255, 255),
+                         (self.w - paddle_width - paddle_distance,  # x
+                          self.y2,  # y
+                          paddle_width,  # width
+                          self.paddle_length))  # height
+        pygame.draw.circle(self.window,
+                           (255, 255, 255),
+                           (self.xball, self.yball), 5)  # ((x, y), radius)
         # update the display
         pygame.display.flip()

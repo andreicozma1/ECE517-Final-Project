@@ -7,6 +7,7 @@ import numpy as np
 import pygame
 import tensorflow as tf
 from matplotlib import pyplot as plt
+from tqdm import tqdm
 
 from PongEnvironment import PongEnvironment
 from NeuralNet import NeuralNet
@@ -20,6 +21,7 @@ class BaseAgent:
         self.env = None
         self.gamma: float = gamma
         logging.info(f"Agent Args: {pprint.pformat(self.__dict__)}")
+        self.global_episode = 0
 
     def get_expected_return(self,
                             rewards: tf.Tensor) -> tf.Tensor:
@@ -53,14 +55,20 @@ class BaseAgent:
         reward_hist = tf.TensorArray(dtype=tf.int32, size=0, dynamic_size=True)
 
         state = env.reset()
+        win = False
         initial_state_shape = state.shape
 
-        for t in tf.range(max_steps):
-            # state = tf.convert_to_tensor(state)
+        tq = tqdm(tf.range(max_steps), desc=f"Ep. {self.global_episode:>6}", leave=False)
+        for t in tq:
             action = self.get_action(t, state)
-
-            state, reward, done = env.tf_step(action)
+            state, reward, done, win = env.tf_step(action)
             state.set_shape(initial_state_shape)
+
+            tq.set_postfix({
+                    'action': int(action),
+                    'reward': int(reward),
+            })
+
             reward_hist = reward_hist.write(t, reward)
             if done:
                 break
@@ -71,6 +79,7 @@ class BaseAgent:
         stats = {
                 "steps"       : len(reward_hist.numpy()),
                 "total_reward": float(tf.math.reduce_sum(reward_hist)),
+                "win"         : win,
         }
         return reward_hist, stats
 

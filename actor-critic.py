@@ -28,7 +28,7 @@ os.environ['WANDB_SILENT'] = "true"
 
 class A2CAgent(BaseAgent):
 
-    def __init__(self, nn: NeuralNet, gamma: float = 0.97):
+    def __init__(self, nn: NeuralNet, gamma: float):
         super().__init__(gamma=gamma)
         self.nn: NeuralNet = nn
         self.action_probs_hist = None
@@ -36,33 +36,27 @@ class A2CAgent(BaseAgent):
         self.state = None
 
     def on_episode_start(self):
-        self.action_probs_hist = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
-        self.critic_returns_hist = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+        self.action_probs_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        self.critic_returns_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         # tensorflow collection of self.nn.input_shape[1] zeros
-        self.state = tf.TensorArray(tf.float32, size=self.nn.max_timesteps, dynamic_size=False)
+        self.state = tf.TensorArray(dtype=tf.float32, size=self.nn.max_timesteps, dynamic_size=True)
 
     def add_to_history(self, t, state_t):
-        self.state = self.state.write(t, tf.reshape(state_t, self.nn.num_features))
-        # if longer than max_timesteps, remove the first element
-        if self.state.size() > self.nn.max_timesteps:
-            self.state = self.state.gather(tf.range(1, self.state.size()))
+        self.state = self.state.write(self.nn.max_timesteps + t, tf.reshape(state_t, self.nn.num_features))
 
     def get_action(self, t, state_t):
         if self.nn.model is None:
             raise ValueError("Model is None")
-        # state = tf.reshape(state, self.nn.input_shape)
-        # state_t = np.expand_dims(state_t, axis=0)
-        # self.state = np.append(self.state, state_t, axis=1)
-        # self.state = self.state[:, -self.num_timesteps:, :]
-        state = self.state.stack()[::-1]
-        print("State: ", state)
+        # logging.debug("=" * 40 + f" @{t} " + "=" * 40)
         self.add_to_history(t, state_t)
-        state = self.state.stack()[::-1]
-        print("State: ", state)
-        # print("State: ", self.state)
-        # print("State shape: ", self.state.shape)
+
+        state = self.state.stack()
+        state = state[-self.nn.max_timesteps:, :]
+        state = tf.reshape(state, self.nn.input_shape)
+        # logging.debug(f"state: {state} \t shape: {state.shape}")
+
         action_logits_t, critic_value = self.nn.model(state)
-        # print(f"Logits: {action_logits_t} | Critic Value: {critic_value}")
+        # logging.debug(f"action_logits_t: {action_logits_t} | critic_value: {critic_value}")
 
         action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
         critic_value = tf.squeeze(critic_value)
@@ -70,6 +64,8 @@ class A2CAgent(BaseAgent):
         # action = tfp.distributions.Categorical(logits=action_logits_t[0]).sample()
         action = tf.random.categorical(action_logits_t, 1)[0, 0]
         action_probs_t = tf.nn.softmax(action_logits_t)
+
+        # logging.debug(f"action: {action} | action_probs_t: {action_probs_t}")
 
         # print(f"Logits: {action_logits_t} | Action: {action} | Probs: {action_probs_t} | Critic Value: {critic_value}")
         self.critic_returns_hist = self.critic_returns_hist.write(t, critic_value)
@@ -209,9 +205,10 @@ class A2CAgent(BaseAgent):
 
 
 def main():
-    env = PongEnvironment(draw=False)
-    nn = NeuralNet("lstm", env.num_states, env.num_actions, max_timesteps=25, learning_rate=0.0001)
-    agent = A2CAgent(nn)
+    # env = PongEnvironment(draw=True, draw_speed=1)
+    env = PongEnvironment(draw=True, draw_speed=None)
+    nn = NeuralNet("lstm", env.num_states, env.num_actions, max_timesteps=5, learning_rate=0.0001)
+    agent = A2CAgent(nn, gamma=0.99)
 
     exp = Experiment(env, agent)
     exp.run_experiment()
