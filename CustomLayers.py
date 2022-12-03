@@ -1,24 +1,27 @@
+import logging
+import pprint
 from typing import Tuple
 
 import tensorflow as tf
-import tensorflow_addons as tfa
 
 keras = tf.keras
 
 
 class A2C(keras.layers.Layer):
-    def __init__(self, num_actions):
-        super(A2C, self).__init__()
+    def __init__(self, num_actions, name="A2C", critic_activation="linear", **kwargs):
+        super(A2C, self).__init__(name=name, **kwargs)
         self.num_actions = num_actions
+        self.critic_activation = critic_activation
         self.actor = keras.layers.Dense(num_actions, name="actor")
-        self.critic = keras.layers.Dense(1, name="critic")
+        self.critic = keras.layers.Dense(1, activation=critic_activation, name="critic")
 
     def get_config(self):
         config = super().get_config()
         config.update({
-                "num_actions": self.num_actions,
-                "actor"      : self.actor.get_config(),
-                "critic"     : self.critic.get_config(),
+                "num_actions"      : self.num_actions,
+                "critic_activation": self.critic_activation,
+                "actor"            : self.actor.get_config(),
+                "critic"           : self.critic.get_config(),
         })
         return config
 
@@ -27,46 +30,140 @@ class A2C(keras.layers.Layer):
 
 
 class ActorLoss(tf.keras.losses.Loss):
-    def __init__(self, name='actor_loss'):
-        super().__init__(name=name, reduction=tf.keras.losses.Reduction.NONE)
+    def __init__(self, name='actor_loss', reduction=tf.keras.losses.Reduction.NONE, **kwargs):
+        super().__init__(name=name, reduction=reduction, **kwargs)
 
     def call(self, advantage, action_probs):
-        action_log_probs = tf.math.log(action_probs)
-        return -tf.math.multiply(action_log_probs, advantage)
+        action_log_probs = -tf.math.log(action_probs)
+        return tf.math.multiply(action_log_probs, advantage)
 
 
-class TransformerBlock(keras.layers.Layer):
-    def __init__(self, embed_dim, num_heads, ff_dim, dropout_rate=0.1):
-        super(TransformerBlock, self).__init__()
-        self.embed_dim, self.num_heads, self.ff_dim, self.dropout_rate = embed_dim, num_heads, ff_dim, dropout_rate
-        self.att = tfa.layers.MultiHeadAttention(head_size=embed_dim, num_heads=num_heads)
-        self.ffn = keras.Sequential([*[keras.layers.Dense(ffd, activation="relu") for ffd in ff_dim],
-                                     keras.layers.Dense(embed_dim)])
+class TransformerEncoderBlock(keras.layers.Layer):
+    def __init__(self,
+                 embed_dim,
+                 num_heads,
+                 ff_dim,
+                 ff_activation="leaky_relu",
+                 dropout=0.1,
+                 name="TransformerEncoderBlock",
+                 **kwargs):
+        super(TransformerEncoderBlock, self).__init__(name=name, **kwargs)
+        self.embed_dim, self.num_heads = embed_dim, num_heads
+        self.ff_dim, self.ff_activation = ff_dim, ff_activation
+        self.dropout_rate = dropout
+
+        self.att = tf.keras.layers.MultiHeadAttention(key_dim=embed_dim, num_heads=num_heads)
+
+        if isinstance(ff_dim, int):
+            ff_dim = [ff_dim]
+
+        ffn_layers = []
+        for dim in ff_dim:
+            ff_activation = keras.layers.LeakyReLU() if ff_activation == "leaky_relu" else keras.layers.Activation(
+                    ff_activation)
+            ffn_layers.extend((keras.layers.Dense(dim, activation=ff_activation), keras.layers.Dropout(dropout)))
+
+        ffn_layers.append(keras.layers.Dense(embed_dim))
+
+        self.ffn = keras.Sequential(ffn_layers)
+
         self.layernorm1 = keras.layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2 = keras.layers.LayerNormalization(epsilon=1e-6)
-        self.dropout1 = keras.layers.Dropout(dropout_rate)
-        self.dropout2 = keras.layers.Dropout(dropout_rate)
+        self.dropout1 = keras.layers.Dropout(dropout)
+        self.dropout2 = keras.layers.Dropout(dropout)
 
     def get_config(self):
         config = super().get_config()
         config.update({
-                "embed_dim"   : self.embed_dim,
-                "num_heads"   : self.num_heads,
-                "ff_dim"      : self.ff_dim,
-                "dropout_rate": self.dropout_rate,
-                "att"         : self.att.get_config(),
-                "ffn"         : self.ffn.get_config(),
-                "layernorm1"  : self.layernorm1.get_config(),
-                "layernorm2"  : self.layernorm2.get_config(),
-                "dropout1"    : self.dropout1.get_config(),
-                "dropout2"    : self.dropout2.get_config(),
+                "embed_dim"    : self.embed_dim,
+                "num_heads"    : self.num_heads,
+                "ff_dim"       : self.ff_dim,
+                "ff_activation": self.ff_activation,
+                "dropout_rate" : self.dropout_rate,
+                "att"          : self.att.get_config(),
+                "ffn"          : self.ffn.get_config(),
+                "layernorm1"   : self.layernorm1.get_config(),
+                "layernorm2"   : self.layernorm2.get_config(),
+                "dropout1"     : self.dropout1.get_config(),
+                "dropout2"     : self.dropout2.get_config(),
         })
         return config
 
     def call(self, inputs, training, mask=None):
+        # Multi-Head Attemtion
         attn_output = self.att(inputs, inputs, attention_mask=mask)
         attn_output = self.dropout1(attn_output, training=training)
+        # Add & Norm
         out1 = self.layernorm1(inputs + attn_output)
+        # Feed Forward
         ffn_output = self.ffn(out1)
         ffn_output = self.dropout2(ffn_output, training=training)
+        # Add & Norm
         return self.layernorm2(out1 + ffn_output)
+
+
+class TransformerEncoder(keras.layers.Layer):
+    def __init__(self, num_layers, embed_dim, num_heads, ff_dim, activation="leaky_relu", dropout=0.1):
+        super(TransformerEncoder, self).__init__()
+        self.num_layers = num_layers
+        self.enc_layers = [TransformerEncoderBlock(embed_dim, num_heads, ff_dim, activation, dropout) for _ in
+                           range(num_layers)]
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+                "num_layers": self.num_layers,
+                "enc_layers": [layer.get_config() for layer in self.enc_layers],
+        })
+        return config
+
+    def call(self, inputs, training, mask=None):
+        x = inputs
+        for i in range(self.num_layers):
+            x = self.enc_layers[i](x, training, mask)
+        return x
+
+
+class StateAndPositionEmbedding(keras.layers.Layer):
+
+    def __init__(self, input_dim, embed_dim):
+        super(StateAndPositionEmbedding, self).__init__()
+        """
+        Returns positional encoding for a given sequence length and embedding dimension,
+        as well as the padding mask for 0 values.
+        """
+
+        # inputs to the model are of shape (1, num_timesteps, num_features)
+        self.num_timesteps = input_dim[1]
+        self.num_features = input_dim[2]
+        self.embed_dim = embed_dim
+
+        self.position_embedding = keras.layers.Embedding(input_dim=self.num_timesteps,
+                                                         output_dim=self.embed_dim)
+        self.state_embedding = keras.layers.Dense(self.embed_dim, activation="relu")
+        self.masking_layer = keras.layers.Masking(mask_value=0.0)
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+                "num_timesteps"     : self.num_timesteps,
+                "num_features"      : self.num_features,
+                "embed_dim"         : self.embed_dim,
+                "position_embedding": self.position_embedding.get_config(),
+                "state_embedding"   : self.state_embedding.get_config(),
+        })
+        return config
+
+    def call(self, inputs):
+        # embed each timestep
+        pos_encoding = self.position_embedding(tf.range(start=0, limit=self.num_timesteps, delta=1))
+        state_embedding = self.state_embedding(inputs)
+
+        mask = self.masking_layer.compute_mask(inputs)
+        # mask = self.masking_layer(state_embedding)
+        mask = tf.cast(mask, tf.bool)
+        mask = tf.reshape(mask, (-1, self.num_timesteps, 1))
+        # repeat the mask for the number of times the state embedding is repeated
+        mask = tf.repeat(mask, self.num_timesteps, axis=2)
+
+        return state_embedding + pos_encoding, mask

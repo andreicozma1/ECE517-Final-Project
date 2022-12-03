@@ -58,7 +58,7 @@ class pongGame:
     # (player location, computer location,
     # x of ball, y of ball,
     # x direction of ball, y direction of ball)
-    def getState(self, include_opponent=True, include_angle=True, include_direction=True, include_last_action=True):
+    def getState(self, include_opponent=False, include_angle=True, include_direction=False, include_last_action=True):
         # Original state
         # state = np.array([self.y1, self.y2,
         #                   self.xball, self.yball,

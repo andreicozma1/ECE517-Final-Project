@@ -7,20 +7,25 @@ import numpy as np
 import pygame
 import tensorflow as tf
 from matplotlib import pyplot as plt
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from tqdm import tqdm
 
 from PongEnvironment import BaseEnvironment, PongEnvironment
 from NeuralNet import NeuralNet
 
 keras = tf.keras
+eps = np.finfo(np.float32).eps.item()
 
 
 class BaseAgent:
 
-    def __init__(self, gamma: float):
-        self.env: BaseEnvironment = None
+    def __init__(self, nn: NeuralNet, gamma: float):
+        self.env = None
+        self.nn: NeuralNet = nn
         self.gamma: float = gamma
         self.global_episode: int = 0
+        self.return_scaler = MinMaxScaler(feature_range=(0, 1))
+        # self.return_scaler = StandardScaler()
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     @property
@@ -28,6 +33,13 @@ class BaseAgent:
         if self.env is None:
             raise ValueError("Environment not set")
         return self.env.save_path_env
+
+    def tf_scale(self, returns) -> tf.Tensor:
+        return tf.numpy_function(self.scale, [returns], tf.float32)
+
+    def scale(self, returns) -> np.ndarray:
+        self.return_scaler.partial_fit(returns)
+        return self.return_scaler.transform(returns)
 
     def get_expected_return(self,
                             rewards: tf.Tensor) -> tf.Tensor:
@@ -48,66 +60,103 @@ class BaseAgent:
             returns = returns.write(i, discounted_sum)
 
         returns = returns.stack()[::-1]
-        returns = tf.math.subtract(returns, tf.math.reduce_mean(returns))
-        returns = tf.math.divide(returns, tf.math.reduce_std(returns) + np.finfo(np.float32).eps.item())
-        # transform such that only positive values are returned
-        # returns = tf.math.add(returns, tf.math.abs(tf.math.reduce_min(returns)))
-        # returns = tf.math.divide(returns, tf.math.reduce_max(returns))
         return returns
 
-    def run_episode(self, env: BaseEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor, dict]:
+    def run_episode(self, env: BaseEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor,
+                                                                                                      tf.Tensor,
+                                                                                                      tf.Tensor,
+                                                                                                      Tuple[tf.Tensor,
+                                                                                                            tf.Tensor]]:
         self.env: BaseEnvironment = env
-        self.on_episode_start()
-        reward_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        action_probs_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        critic_returns_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
+        state_hist = tf.TensorArray(dtype=tf.float32, size=self.nn.max_timesteps, dynamic_size=True)
 
-        state, reward, done = env.reset(), None, False
-        initial_state_shape = state.shape
+        rewards = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
-        tq = tqdm(tf.range(max_steps), desc=f"Ep. {self.global_episode:>6}", leave=False)
-        for t in tq:
-            action = self.get_action(t, state)
+        initial_state = env.tf_reset()
+        initial_state_shape = initial_state.shape
+        state = initial_state
+
+        # tq = tqdm(tf.range(max_steps), desc=f"Ep. {self.global_episode:>6}", leave=False)
+        steps = 0
+        for t in tf.range(max_steps):
+            steps = t
+
+            # action = self.get_action(step, state, deterministic)
+            state_hist = state_hist.write(self.nn.max_timesteps + t, tf.squeeze(state))
+            current_state = state_hist.stack()
+            current_state = current_state[-self.nn.max_timesteps:, :]
+            current_state = tf.reshape(current_state, self.nn.input_shape)
+            # logging.info(f"state: {state} \t shape: {state.shape}")
+
+            action_logits_t, critic_value = self.nn.model(current_state)
+            # logging.debug(f"action_logits_t: {action_logits_t} | critic_value: {critic_value}")
+
+            action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
+            critic_value = tf.squeeze(critic_value)
+
+            # action = tfp.distributions.Categorical(logits=action_logits_t[0]).sample()
+            action = tf.random.categorical(action_logits_t, 1)[0, 0]
+            action_probs_t = tf.nn.softmax(action_logits_t)
+            if deterministic:
+                action = tf.argmax(action_probs_t, axis=1)[0]
+
+            # logging.debug(f"action: {action} | action_probs_t: {action_probs_t}")
+
+            critic_returns_hist = critic_returns_hist.write(t, critic_value)
+            # print(action_probs_t)
+            action_probs_hist = action_probs_hist.write(t, action_probs_t[0, action])
+
             state, reward, done = env.tf_step(action)
             state.set_shape(initial_state_shape)
 
-            tq.set_postfix({
-                    'action': int(action),
-                    'reward': int(reward),
-            })
+            # tq.set_postfix({
+            #         'action': int(action),
+            #         'reward': int(reward),
+            # })
 
-            reward_hist = reward_hist.write(t, reward)
-            if done:
+            rewards = rewards.write(t, reward)
+            if tf.cast(done, tf.bool):
                 break
 
-        reward_hist = reward_hist.stack()
-        self.on_episode_end()
+        rewards = rewards.stack()
+        action_probs_hist = action_probs_hist.stack()
+        critic_returns_hist = critic_returns_hist.stack()
+        # histories = self.on_episode_end(histories)
 
-        stats: dict = {
-                "steps"       : len(reward_hist.numpy()),
-                "total_reward": float(tf.math.reduce_sum(reward_hist)),
-        }
-        return reward_hist, stats
+        total_reward = tf.math.reduce_sum(rewards)
+        return steps, total_reward, rewards, (action_probs_hist, critic_returns_hist)
 
     @abc.abstractmethod
     def on_episode_start(self):
         pass
 
     @abc.abstractmethod
-    def get_action(self, t, state):
+    def get_action(self, t, state, deterministic):
         pass
 
-    @abc.abstractmethod
-    def on_episode_end(self):
-        pass
+    # @abc.abstractmethod
+    # def on_episode_end(self, histories):
+    #     pass
 
     # @tf.function
-    def train_step(self, env: BaseEnvironment, max_steps_per_episode: int) -> dict:
+    def train_step(self, env: BaseEnvironment, max_steps_per_episode: int) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         self.env: BaseEnvironment = env
         with tf.GradientTape() as tape:
-            rewards, stats = self.run_episode(env, max_steps_per_episode, deterministic=False)
-            self.on_update(rewards, tape)
+            steps, total_reward, rewards, extras = self.run_episode(env, max_steps_per_episode)
+            # rewards, action_probs_hist, critic_returns_hist, steps, total_reward = self.run_episode(env,
+            #                                                                                         max_steps_per_episode)
 
-        return stats
+            compute_error_vals = self.compute_error(rewards, extras)
+
+        self.on_update(compute_error_vals, tape)
+        return steps, total_reward, compute_error_vals
 
     @abc.abstractmethod
-    def on_update(self, rewards, tape):
+    def compute_error(self, rewards, extras):
+        pass
+
+    @abc.abstractmethod
+    def on_update(self, compute_error_vals, tape):
         pass

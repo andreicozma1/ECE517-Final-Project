@@ -1,10 +1,12 @@
 import logging
 import pprint
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 
-from CustomLayers import A2C, ActorLoss, TransformerBlock
+from CustomLayers import A2C, ActorLoss, StateAndPositionEmbedding, TransformerEncoder, \
+    TransformerEncoderBlock
 
 keras = tf.keras
 
@@ -20,19 +22,22 @@ class NeuralNet:
         self.learning_rate: float = learning_rate
         self.max_timesteps: int = max_timesteps
         self.input_shape = (1, self.max_timesteps, self.num_features)
-        self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_model(name, **kwargs)
+        self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_a2c_model(name, **kwargs)
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
-    def create_model(self, model_name: str, **kwargs):
+    def create_a2c_model(self, model_name: str, **kwargs):
         logging.info(f"Model: {model_name}")
         logging.info(f"kwargs: {pprint.pformat(kwargs)}")
+        c_final_act = self.get_activation("linear", kwargs)
+
         inputs = keras.layers.Input(batch_input_shape=self.input_shape, name="input")
 
         actor_inputs, critic_inputs = getattr(self, f"inner_{model_name}")(inputs, **kwargs)
 
-        ac_layer = A2C(self.num_actions)(actor_inputs=actor_inputs, critic_inputs=critic_inputs)
+        ac_layer = A2C(self.num_actions, critic_activation=c_final_act)
+        ac_outputs = ac_layer(actor_inputs=actor_inputs, critic_inputs=critic_inputs)
 
-        model = keras.Model(inputs=inputs, outputs=ac_layer, name=model_name)
+        model = keras.Model(inputs=inputs, outputs=ac_outputs, name=model_name)
         model.summary()
 
         # config = model.get_config()
@@ -50,105 +55,110 @@ class NeuralNet:
 
         ###################################################################
         # OPTIMIZER
-        # optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
+        optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=self.learning_rate)
         # optimizer = tfa.optimizers.AdamW(
         #         learning_rate=self.learning_rate, weight_decay=0.000005, amsgrad=True
         # )
-        optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
+        # optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
 
         ###################################################################
         # LOSS
-        critic_loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
-        # critic_loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE, delta=0.5)
+        # critic_loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
+        critic_loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
         actor_loss = ActorLoss()
 
         return model, optimizer, critic_loss, actor_loss
 
-    def inner_lstm(self, inputs, **kwargs):
-        common = keras.layers.Dense(256, activation="elu", kernel_initializer="he_uniform")(inputs)
-        # common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
-        # common = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
+    def inner_transformer(self, inputs, **kwargs):
+        comm_act, a_act, c_act = self.get_a2c_activations(kwargs)
 
-        sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(common)
-        # sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(sequences)
-        # sequences, state_h, state_c = keras.layers.LSTM(128, return_sequences=True, return_state=True)(sequences)
+        emb_dim = 128
+        t_layers = 3
+        t_num_heads = 10
+        t_dropout = 0.1
+        t_ff_dim = [256, 256, 256]
 
-        lstm = keras.layers.LSTM(128, return_sequences=False)(sequences)
+        emb = StateAndPositionEmbedding(input_dim=self.input_shape,
+                                        embed_dim=emb_dim)
+        emb_out, padding_mask = emb(inputs)
 
-        common = keras.layers.Dropout(0.5)(lstm)
+        transformer = TransformerEncoder(num_layers=t_layers, embed_dim=emb_dim,
+                                         num_heads=t_num_heads,
+                                         ff_dim=t_ff_dim, dropout=t_dropout)
+        transformer_out = transformer(emb_out, training=True, mask=padding_mask)
 
-        actor = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
-        actor = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(actor)
-        actor = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(actor)
+        # global average pooling
+        common = keras.layers.GlobalAveragePooling1D()(transformer_out)
+        common = keras.layers.Dense(128, activation=comm_act)(common)
+        common = keras.layers.Dense(128, activation=comm_act)(common)
+        common = keras.layers.Dense(128, activation=comm_act)(common)
+        common = keras.layers.Dense(128, activation=comm_act)(common)
 
-        critic = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(common)
-        critic = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(critic)
-        critic = keras.layers.Dense(128, activation="elu", kernel_initializer="he_uniform")(critic)
+        actor_inp = keras.layers.Dense(128, activation=a_act)(common)
+        actor_inp = keras.layers.Dense(128, activation=a_act)(actor_inp)
 
-        return actor, critic
+        critic_inp = keras.layers.Dense(128, activation=c_act)(common)
+        critic_inp = keras.layers.Dense(128, activation=c_act)(critic_inp)
 
-    def inner_dense(self, inputs, **kwargs):
-        common = keras.layers.Flatten()(inputs)
+        return actor_inp, critic_inp
 
-        common = keras.layers.Dense(64)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(128)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(256)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(512)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(256)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(128)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        common = keras.layers.Dense(64)(common)
-        common = keras.layers.LeakyReLU(alpha=0.05)(common)
-        # common = keras.layers.Dropout(0.1)(common)
+    def get_a2c_activations(self, kwargs):
+        common_activation = self.get_activation("relu", kwargs)
+        actor_activation = self.get_activation("relu", kwargs)
+        critic_activation = self.get_activation("relu", kwargs)
+        return common_activation, actor_activation, critic_activation
 
-        # common = keras.layers.LeakyReLU(alpha=0.1)(common)
-        # actor = keras.layers.Dense(512)(common)
-        # critic = keras.layers.Dense(512)(common)
+    def get_activation(self, act, kwargs):
+        if "common_activation" in kwargs:
+            act = kwargs["common_activation"]
+        if act == "leaky_relu":
+            act = keras.layers.LeakyReLU()
+        return act
 
-        return common, common
 
-    def inner_attention(self, inputs, **kwargs):
-        common = keras.layers.LSTM(128, return_sequences=True, stateful=False)(inputs)
-        common = keras.layers.Dropout(0.2)(common)
+def main():
+    # state shape (1, 10, 4)
+    # set the first 7 timesteps to 0
+    # set the last 3 timesteps to random values
 
-        # LSTM Actor
-        lstm_actor = keras.layers.LSTM(128, return_sequences=False)(common)
-        lstm_actor = keras.layers.Dropout(0.5)(lstm_actor)
-        # LSTM Critic
-        lstm_critic = keras.layers.LSTM(128, return_sequences=False)(common)
-        lstm_critic = keras.layers.Dropout(0.5)(lstm_critic)
+    num_timesteps = 10
+    num_features = 4
+    state = np.zeros((1, num_timesteps, num_features))
+    state[:, 7:, :] = np.random.rand(1, 3, num_features)
 
-        # # Dense Actor
-        dense_actor = keras.layers.Dense(128, activation="relu")(lstm_actor)
-        dense_actor = keras.layers.Dropout(0.2)(dense_actor)
+    print(state)
 
-        # Dense Critic
-        dense_critic = keras.layers.Dense(128, activation="relu")(lstm_critic)
-        dense_critic = keras.layers.Dropout(0.2)(dense_critic)
+    emb_dim = 16
 
-        # Merge
-        att_a = keras.layers.MultiHeadAttention(num_heads=6, key_dim=64, dropout=0.2)(dense_critic, dense_actor)
-        att_a = keras.layers.Dropout(0.2)(att_a)
+    input_embedding, padding_mask = StateAndPositionEmbedding(input_dim=(1, num_timesteps, num_features),
+                                                              embed_dim=emb_dim)(state)
 
-        att_c = keras.layers.MultiHeadAttention(num_heads=6, key_dim=64, dropout=0.2)(dense_critic, dense_critic)
-        att_c = keras.layers.Dropout(0.2)(att_c)
+    print(input_embedding)
+    print(padding_mask)
 
-        # Multiply the actor by the attention of the critic
-        att_a = keras.layers.Multiply()([dense_actor, att_a])
-        att_a = keras.layers.Dropout(0.2)(att_a)
+    # position_embedding = keras.layers.Embedding(input_dim=num_timesteps, output_dim=emb_dim)
+    # state_embedding = keras.layers.Dense(emb_dim, activation="relu")
+    #
+    # embedded = position_embedding(np.arange(num_timesteps))
+    # # embedded = tf.expand_dims(embedded, axis=0)
+    # print(embedded.shape)
+    # print(embedded)
+    #
+    # # embed the state
+    # embedded_state = state_embedding(state)
+    # print(embedded_state.shape)
+    # print(embedded_state)
+    # #
+    # # # create a mask
+    # masking = keras.layers.Masking(mask_value=0.0)
+    # mask = masking(embedded_state)
+    # print(mask.shape)
+    # print(mask)
+    #
+    # mask_bool = tf.cast(mask, tf.bool)
+    # print(mask_bool)
 
-        # Multiply the critic by the attention of the actor
-        att_c = keras.layers.Multiply()([dense_critic, att_c])
-        att_c = keras.layers.Dropout(0.2)(att_c)
 
-        # Flatten
-        actor = keras.layers.Flatten()(att_a)
-        critic = keras.layers.Flatten()(att_c)
-
-        return actor, critic
+if __name__ == "__main__":
+    main()

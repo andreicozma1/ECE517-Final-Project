@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Tuple
 
 import numpy as np
 import pygame
@@ -29,81 +30,83 @@ os.environ['WANDB_SILENT'] = "true"
 class A2CAgent(BaseAgent):
 
     def __init__(self, nn: NeuralNet, gamma: float):
-        super().__init__(gamma=gamma)
-        self.nn: NeuralNet = nn
-        self.action_probs_hist = None
-        self.critic_returns_hist = None
-        self.state = None
+        super().__init__(nn=nn, gamma=gamma)
+        self.actor_loss_multiplier = 1.0
+        self.critic_loss_multiplier = 0.1
+        # self.nn: NeuralNet = nn
 
-    def on_episode_start(self):
-        self.action_probs_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        self.critic_returns_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        # tensorflow collection of self.nn.input_shape[1] zeros
-        self.state = tf.TensorArray(dtype=tf.float32, size=self.nn.max_timesteps, dynamic_size=True)
+    def normalize(self, values):
+        c_min = tf.reduce_min(values)
+        c_max = tf.reduce_max(values)
+        c_range = c_max - c_min
+        values = (values - c_min) / c_range
+        return values
 
-    def add_to_history(self, t, state_t):
-        self.state = self.state.write(self.nn.max_timesteps + t, tf.reshape(state_t, self.nn.num_features))
+    def standardize(self, values):
+        mean = tf.reduce_mean(values)
+        std = tf.math.reduce_std(values)
+        values = (values - mean) / std
+        return values
 
-    def get_action(self, t, state_t):
-        if self.nn.model is None:
-            raise ValueError("Model is None")
-        # logging.debug("=" * 40 + f" @{t} " + "=" * 40)
-        self.add_to_history(t, state_t)
+    def compute_error(self, rewards, extras):
+        action_probs, critic_returns = extras
+        actual_returns = self.get_expected_return(rewards)
 
-        state = self.state.stack()
-        state = state[-self.nn.max_timesteps:, :]
-        state = tf.reshape(state, self.nn.input_shape)
-        # logging.info(f"state: {state} \t shape: {state.shape}")
+        actual_returns = self.normalize(actual_returns)
+        critic_returns = self.normalize(critic_returns)
 
-        action_logits_t, critic_value = self.nn.model(state)
-        # logging.debug(f"action_logits_t: {action_logits_t} | critic_value: {critic_value}")
+        action_probs = tf.reshape(action_probs, shape=(-1, 1))
+        critic_returns = tf.reshape(critic_returns, shape=(-1, 1))
+        actual_returns = tf.reshape(actual_returns, shape=(-1, 1))
 
-        action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
-        critic_value = tf.squeeze(critic_value)
+        loss, advantage = self.compute_loss(action_probs, critic_returns, actual_returns)
 
-        # action = tfp.distributions.Categorical(logits=action_logits_t[0]).sample()
-        action = tf.random.categorical(action_logits_t, 1)[0, 0]
-        action_probs_t = tf.nn.softmax(action_logits_t)
+        self.plot_ret(actual_returns, advantage, critic_returns)
 
-        # logging.debug(f"action: {action} | action_probs_t: {action_probs_t}")
-
-        # print(f"Logits: {action_logits_t} | Action: {action} | Probs: {action_probs_t} | Critic Value: {critic_value}")
-        self.critic_returns_hist = self.critic_returns_hist.write(t, critic_value)
-        self.action_probs_hist = self.action_probs_hist.write(t, action_probs_t[0, action])
-        return action
-
-    def on_episode_end(self):
-        # self.nn.model.reset_states()
-        self.action_probs_hist = self.action_probs_hist.stack()
-        self.critic_returns_hist = self.critic_returns_hist.stack()
+        return loss
 
     def compute_loss(self,
                      action_probs: tf.Tensor,
                      critic_returns: tf.Tensor,
-                     actual_returns: tf.Tensor) -> tf.Tensor:
+                     actual_returns: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         """Computes the combined Actor-Critic loss."""
         if self.nn.critic_loss is None:
             raise ValueError("Loss is None")
         # create multipliers for actor and critic losses
-        actor_loss_multiplier = 0.5
-        critic_loss_multiplier = 1.0
 
         # If action is better than average, the advantage function is positive,
         # if worse, it is negative.
-        advantage = tf.math.subtract(actual_returns, critic_returns)
-        # print(f"ARs: {actual_vals.shape} | CRs: {critic_vals.shape} | Adv: {advantage.shape}")
-
-        # action_log_probs = -1 * tf.math.log(action_probs)
-        # actor_losses = actor_loss_multiplier * tf.math.multiply(action_log_probs, advantage)
+        advantage = actual_returns - critic_returns
 
         actor_losses = actor_loss_multiplier * self.nn.actor_loss(advantage, action_probs)
+        actor_losses = tf.reduce_sum(actor_losses, axis=1)
+        actor_losses = self.normalize(actor_losses)
 
+        # critic_loss = huber_loss(critic_values, actual_returns) <- Example says this
+        # critic_loss = huber_loss(y_true, y_pred) <- This is what the docs say
+        # Hmmmmm
         critic_losses = critic_loss_multiplier * self.nn.critic_loss(critic_returns, actual_returns)
-        critic_losses = tf.reshape(critic_losses, shape=(tf.shape(actor_losses)))
+        critic_losses = self.normalize(critic_losses)
+
+        # calculate entropy loss
+        # this is a regularization term that encourages the policy to be more exploratory
+        entropy_loss = tf.math.multiply(action_probs, -tf.math.log(action_probs)) * 0.01
 
         total_losses = actor_losses + critic_losses
-        total_loss_sum = tf.math.reduce_sum(total_losses)
 
+        final_loss = tf.reduce_sum(total_losses)
+
+        self.plot_loss(actor_losses, critic_losses, entropy_loss, total_losses)
+
+        return final_loss, advantage
+
+    def on_update(self, loss, tape):
+        # Compute the gradients from the loss
+        grads = tape.gradient(loss, self.nn.model.trainable_variables)
+        # Apply the gradients to the model's parameters
+        self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
+
+    def plot_ret(self, actual_returns, advantage, critic_returns):
         plot_returns = {
                 "plot"        : [
                         {
@@ -145,14 +148,16 @@ class A2CAgent(BaseAgent):
                                 "linestyle": "--"
                         }
                 ],
+                "suptitle"    : f"A2C Returns ({self.env.name}): "
+                                f"{self.nn.name} - {self.nn.input_shape}" +
+                                f" + ({self.env.state_scaler.__class__.__name__})"
+                if self.env.state_scaling is True else "",
         }
+        PlotHelper.plot_from_dict(plot_returns, savefig="plots/a2c_returns.pdf")
+
+    def plot_loss(self, actor_losses, critic_losses, entropy_loss, total_losses):
         plot_losses = {
                 "plot"   : [
-                        {
-                                "args" : [tf.squeeze(action_probs)],
-                                "label": "Actor Probs",
-                                "color": "steelblue"
-                        },
                         {
                                 "args" : [tf.squeeze(actor_losses)],
                                 "label": "Actor Loss",
@@ -164,9 +169,14 @@ class A2CAgent(BaseAgent):
                                 "color": "salmon"
                         },
                         {
-                                "args" : [tf.squeeze(total_losses)],
+                                "args" : [total_losses],
                                 "label": "Total Loss",
                                 "color": "black"
+                        },
+                        {
+                                "args" : [tf.squeeze(entropy_loss)],
+                                "label": "Entropy",
+                                "color": "darkorange"
                         },
 
                 ],
@@ -177,44 +187,27 @@ class A2CAgent(BaseAgent):
                                 "linestyle": "--"
                         }
                 ],
+                "title"  : f"A2C Losses ({self.env.name}): {self.nn.name} + "
+                           f"{self.nn.critic_loss.__class__.__name__} + "
+                           f"{self.nn.optimizer.__class__.__name__} - "
+                           f"LR: {self.nn.learning_rate}",
         }
-
         PlotHelper.plot_from_dict(plot_losses, savefig="plots/a2c_losses.pdf")
-        PlotHelper.plot_from_dict(plot_returns, savefig="plots/a2c_returns.pdf")
-
-        return total_loss_sum
-
-    def on_update(self, rewards, tape):
-        if self.nn.optimizer is None:
-            raise ValueError("Optimizer is None")
-        # Calculate the expected returns
-        actual_returns = self.get_expected_return(rewards)
-
-        # Convert training data to appropriate TF tensor shapes
-        action_probs, critic_returns, actual_returns = [
-                tf.expand_dims(x, 1) for x in [self.action_probs_hist, self.critic_returns_hist, actual_returns]]
-
-        # Calculate the loss values to update our network
-        loss = self.compute_loss(action_probs, critic_returns, actual_returns)
-
-        # Compute the gradients from the loss
-        grads = tape.gradient(loss, self.nn.model.trainable_variables)
-        # # Pygame stopped responding fix
-        # if self.env.draw:
-        #     pygame.event.pump()
-        # Apply the gradients to the model's parameters
-        self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
 
 
 def main():
-    # env = PongEnvironment(draw=True, draw_speed=1)
-    env = PongEnvironment(draw=True, draw_speed=None)
-    # env = LunarLander(draw=True, draw_speed=None)
-    nn = NeuralNet("lstm", env.num_states, env.num_actions, max_timesteps=5, learning_rate=0.0001)
-    agent = A2CAgent(nn, gamma=0.99)
+    # env = PongEnvironment(draw=True, draw_speed=None)
+    env = LunarLander(draw=False, draw_speed=None, state_scaling=True)
+
+    nn = NeuralNet("transformer",
+                   env.num_states, env.num_actions,
+                   max_timesteps=25, learning_rate=0.001)
+    agent = A2CAgent(nn, gamma=0.97)
 
     exp = Experiment(env, agent)
+
     exp.run_experiment()
+    exp.run_test()
 
 
 if __name__ == "__main__":
