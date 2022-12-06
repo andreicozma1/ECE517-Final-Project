@@ -58,7 +58,7 @@ class BaseEnvironment:
 
     def reset_scaler(self):
         logging.warning("Creating new state scaler")
-        self.state_scaler = MinMaxScaler(feature_range=(0, 1))
+        self.state_scaler = MinMaxScaler(feature_range=(-1, 1))
         # self.state_scaler = StandardScaler()
 
     def transform_state(self, state):

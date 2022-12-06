@@ -99,10 +99,10 @@ class BaseAgent:
             last_t_states = tf.clip_by_value(last_t_states, 0, t)
             last_t_states = tf.reshape(last_t_states, self.nn.input_t_shape)
 
-            print("=" * 80)
-            print(current_state)
-            print(current_action_hist)
-            print(last_t_states)
+            # print("=" * 80)
+            # print(current_state)
+            # print(current_action_hist)
+            # print(last_t_states)
 
             # logging.info(f"state: {state} \t shape: {state.shape}")
             action_logits_t, critic_value = self.nn.model([last_t_states, current_state, current_action_hist])

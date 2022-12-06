@@ -131,36 +131,35 @@ class TransformerEncoder(keras.layers.Layer):
 
 class StateAndPositionEmbedding(keras.layers.Layer):
 
-    def __init__(self, input_dim, embed_dim):
+    def __init__(self, num_inputs, num_timesteps, embed_dim):
         super(StateAndPositionEmbedding, self).__init__()
         """
         Returns positional encoding for a given sequence length and embedding dimension,
         as well as the padding mask for 0 values.
         """
-
-        # inputs to the model are of shape (1, num_timesteps, num_features)
-        self.num_timesteps = input_dim[1]
-        self.num_features = input_dim[2]
+        self.num_inputs = num_inputs
+        self.num_timesteps = num_timesteps
         self.embed_dim = embed_dim
-
         self.position_embedding = keras.layers.Embedding(input_dim=self.num_timesteps,
                                                          output_dim=self.embed_dim)
-        self.state_embedding = keras.layers.Dense(self.embed_dim, activation="linear")
+        # self.state_embedding = keras.layers.Dense(self.embed_dim, activation="linear")
+        # Create dense layers for each input
+        self.state_embedding = [keras.layers.Dense(self.embed_dim, activation="linear") for _ in range(self.num_inputs)]
 
     def get_config(self):
         config = super().get_config()
         config.update({
                 "num_timesteps"     : self.num_timesteps,
-                "num_features"      : self.num_features,
                 "embed_dim"         : self.embed_dim,
                 "position_embedding": self.position_embedding.get_config(),
-                "state_embedding"   : self.state_embedding.get_config(),
+                "state_embedding"   : self.state_embedding
         })
         return config
 
-    def call(self, positions, inputs):
+    def call(self, pos_arr, inputs):
         # embed each timestep
-        # pos_encoding = self.position_embedding(tf.range(start=0, limit=self.num_timesteps, delta=1))
-        pos_encoding = self.position_embedding(positions)
-        state_embedding = self.state_embedding(inputs)
-        return state_embedding + pos_encoding
+        pos_encoding = self.position_embedding(pos_arr)
+        # embed each input
+        input_encoding = [self.state_embedding[i](inputs[i]) + pos_encoding for i in range(self.num_inputs)]
+        # sum the positional and input encoding
+        return tf.math.add_n(input_encoding)

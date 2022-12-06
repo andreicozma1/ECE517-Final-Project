@@ -32,9 +32,9 @@ class A2CAgent(BaseAgent):
 
     def __init__(self, nn: NeuralNet,
                  gamma: float = 0.97,
-                 actor_loss_multiplier: float = 1.0,
-                 critic_loss_multiplier: float = 0.5,
-                 entropy_loss_multiplier: float = 0.1,
+                 actor_loss_multiplier: float = 0.5,
+                 critic_loss_multiplier: float = 1.0,
+                 entropy_loss_multiplier: float = 0.01,
                  ):
         super().__init__(nn=nn, gamma=gamma)
         self.actor_loss_multiplier = actor_loss_multiplier
@@ -89,15 +89,15 @@ class A2CAgent(BaseAgent):
         advantage = actual_returns - critic_returns
 
         actor_losses = self.nn.actor_loss(action_probs, advantage)
-        # actor_losses = self.standardize(actor_losses)
+        actor_losses = self.normalize(actor_losses)
         actor_losses = tf.math.multiply(actor_losses, self.actor_loss_multiplier)
 
         entropy_loss = self.get_entropy_loss(action_probs)
-        # entropy_loss = self.standardize(entropy_loss)
+        entropy_loss = self.normalize(entropy_loss)
         entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
 
         critic_losses = self.nn.critic_loss(critic_returns, actual_returns)
-        # critic_losses = self.standardize(critic_losses)
+        critic_losses = self.normalize(critic_losses)
         critic_losses = tf.math.multiply(critic_losses, self.critic_loss_multiplier)
 
         total_losses = tf.math.add(actor_losses, critic_losses, entropy_loss)
@@ -211,7 +211,7 @@ def main():
 
     nn = NeuralNet("transformer",
                    env.num_states, env.num_actions,
-                   max_timesteps=10, learning_rate=0.00001)
+                   max_timesteps=25, learning_rate=0.000001)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent)

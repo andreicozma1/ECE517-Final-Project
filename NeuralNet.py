@@ -85,12 +85,11 @@ class NeuralNet:
 
     def inner_transformer(self, input_t, input_states, input_actions, **kwargs):
         comm_act, a_act, c_act = self.get_a2c_activations(kwargs)
-        state_emb_dim = 32
-        action_emb_dim = 16
-        t_layers = 1
+        emb_dim = 256
+        t_layers = 2
         t_num_heads = 10
         t_dropout = 0.1
-        t_ff_dim = [512, 512]
+        t_ff_dim = [512, 512, 512]
 
         masking_layer = keras.layers.Masking(mask_value=0.0)
         attention_mask = masking_layer.compute_mask(input_states)
@@ -99,20 +98,18 @@ class NeuralNet:
 
         # repeat the mask for the number of times the state embedding is repeated
 
-        emb_state = StateAndPositionEmbedding(input_dim=self.input_state_shape,
-                                              embed_dim=state_emb_dim)
-        emb_state_out = emb_state(input_t, input_states)
+        embs = StateAndPositionEmbedding(num_inputs=2,
+                                         num_timesteps=self.max_timesteps,
+                                         embed_dim=emb_dim)
+        embs_out = embs(input_t, [input_states, input_actions])
 
-        emb_action = StateAndPositionEmbedding(input_dim=self.input_actions_shape,
-                                               embed_dim=action_emb_dim)
-        emb_action_out = emb_action(input_t, input_actions)
+        layer_norm = keras.layers.LayerNormalization()
+        layer_norm_out = layer_norm(embs_out)
 
-        emb_out = tf.concat([emb_state_out, emb_action_out], axis=-1)
-
-        transformer = TransformerEncoder(num_layers=t_layers, embed_dim=state_emb_dim + action_emb_dim,
+        transformer = TransformerEncoder(num_layers=t_layers, embed_dim=emb_dim,
                                          num_heads=t_num_heads,
                                          ff_dim=t_ff_dim, dropout=t_dropout)
-        transformer_out = transformer(emb_out, training=True, mask=attention_mask)
+        transformer_out = transformer(layer_norm_out, training=True, mask=attention_mask)
 
         # flatten
         # common = keras.layers.Flatten()(transformer_out)
