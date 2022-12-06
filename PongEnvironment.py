@@ -1,4 +1,5 @@
 import abc
+import collections
 import logging
 import os
 import pprint
@@ -18,10 +19,12 @@ class BaseEnvironment:
                  num_states: int,
                  num_actions: int,
                  base_folder="./saves/",
-                 state_scaling: bool = True):
+                 state_scaling: bool = True,
+                 append_n_actions: int = 0):
         self.name: str = name
-        self.num_states: int = num_states
+        self.num_states: int = num_states + append_n_actions
         self.num_actions: int = num_actions
+        self.append_n_actions: int = append_n_actions
         self.save_path_root: str = base_folder
         self.state_scaler_enable: bool = state_scaling
         self.save_path_env: str = os.path.join(self.save_path_root, self.name)
@@ -29,6 +32,8 @@ class BaseEnvironment:
 
         self.state_scaler, self.state_scaler_path = None, os.path.join(self.save_path_env, "state_scaler.pkl")
         self.load_scaler()
+        self.last_n_actions: collections.deque = collections.deque(maxlen=append_n_actions)
+        self.last_n_actions.extend([0] * append_n_actions)
 
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
@@ -53,8 +58,8 @@ class BaseEnvironment:
 
     def reset_scaler(self):
         logging.warning("Creating new state scaler")
-        # self.state_scaler = MinMaxScaler(feature_range=(0, 1))
-        self.state_scaler = StandardScaler()
+        self.state_scaler = MinMaxScaler(feature_range=(0, 1))
+        # self.state_scaler = StandardScaler()
 
     def transform_state(self, state):
         if self.state_scaler_enable:
@@ -77,7 +82,9 @@ class BaseEnvironment:
 
     def step(self, action) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         state, reward, done = self._step(action)
+        state = np.append(state, self.last_n_actions)
         state = self.transform_state(state)
+        self.last_n_actions.append(action)
         return state.astype(np.float32), np.array(reward, np.float32), np.array(done, np.int32)
 
     def tf_reset(self) -> tf.Tensor:
@@ -89,6 +96,8 @@ class BaseEnvironment:
 
     def reset(self) -> np.ndarray:
         state = self._reset()
+        self.last_n_actions.extend([0] * self.append_n_actions)
+        state = np.append(state, self.last_n_actions)
         state = self.transform_state(state)
         joblib.dump(self.state_scaler, self.state_scaler_path)
         return np.array(state, dtype=np.float32)

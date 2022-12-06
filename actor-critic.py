@@ -34,7 +34,7 @@ class A2CAgent(BaseAgent):
                  gamma: float = 0.97,
                  actor_loss_multiplier: float = 1.0,
                  critic_loss_multiplier: float = 0.5,
-                 entropy_loss_multiplier: float = 0.05,
+                 entropy_loss_multiplier: float = 0.1,
                  ):
         super().__init__(nn=nn, gamma=gamma)
         self.actor_loss_multiplier = actor_loss_multiplier
@@ -157,7 +157,7 @@ class A2CAgent(BaseAgent):
                         }
                 ],
                 "suptitle"    : f"A2C Returns ({self.env.name}): "
-                                f"{self.nn.name} - {self.nn.input_shape}" +
+                                f"{self.nn.name} - {self.nn.input_state_shape}" +
                                 f" + ({self.env.state_scaler.__class__.__name__})"
                 if self.env.state_scaler_enable is True else "",
         }
@@ -211,7 +211,7 @@ def main():
 
     nn = NeuralNet("transformer",
                    env.num_states, env.num_actions,
-                   max_timesteps=50, learning_rate=0.00001)
+                   max_timesteps=10, learning_rate=0.00001)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent)

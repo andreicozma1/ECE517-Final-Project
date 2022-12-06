@@ -23,7 +23,9 @@ class NeuralNet:
         self.num_actions: int = num_actions
         self.learning_rate: float = learning_rate
         self.max_timesteps: int = max_timesteps
-        self.input_shape = (1, self.max_timesteps, self.num_features)
+        self.input_t_shape = (1, self.max_timesteps)
+        self.input_state_shape = (1, self.max_timesteps, self.num_features)
+        self.input_actions_shape = (1, self.max_timesteps, self.num_actions)
         self.kwargs = kwargs
         self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_model(name, **kwargs)
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
@@ -49,14 +51,19 @@ class NeuralNet:
         logging.info(f"kwargs: {pprint.pformat(kwargs)}")
         c_final_act = self.get_activation("c_final_act", "linear", kwargs)
 
-        inputs = keras.layers.Input(batch_input_shape=self.input_shape, name="input")
+        input_t = keras.layers.Input(batch_input_shape=self.input_t_shape, name="input_t")
+        input_states = keras.layers.Input(batch_input_shape=self.input_state_shape, name="input_states")
+        input_actions = keras.layers.Input(batch_input_shape=self.input_actions_shape, name="input_actions")
 
-        actor_inputs, critic_inputs = getattr(self, f"inner_{model_name}")(inputs, **kwargs)
+        actor_inputs, critic_inputs = getattr(self, f"inner_{model_name}")(input_t,
+                                                                           input_states,
+                                                                           input_actions,
+                                                                           **kwargs)
 
         ac_layer = A2C(self.num_actions, critic_activation=c_final_act)
         ac_outputs = ac_layer(actor_inputs=actor_inputs, critic_inputs=critic_inputs)
 
-        model = keras.Model(inputs=inputs, outputs=ac_outputs, name=model_name)
+        model = keras.Model(inputs=[input_t, input_states, input_actions], outputs=ac_outputs, name=model_name)
         model.summary()
 
         ###################################################################
@@ -76,29 +83,40 @@ class NeuralNet:
 
         return model, optimizer, critic_loss, actor_loss
 
-    def inner_transformer(self, inputs, **kwargs):
+    def inner_transformer(self, input_t, input_states, input_actions, **kwargs):
         comm_act, a_act, c_act = self.get_a2c_activations(kwargs)
-
-        emb_dim = 64
+        state_emb_dim = 32
+        action_emb_dim = 16
         t_layers = 1
         t_num_heads = 10
         t_dropout = 0.1
-        t_ff_dim = [256, 256, 256, 256, 256]
+        t_ff_dim = [512, 512]
 
-        emb = StateAndPositionEmbedding(input_dim=self.input_shape,
-                                        embed_dim=emb_dim)
-        emb_out, padding_mask = emb(inputs)
+        masking_layer = keras.layers.Masking(mask_value=0.0)
+        attention_mask = masking_layer.compute_mask(input_states)
+        attention_mask = tf.cast(attention_mask, tf.float32)
+        attention_mask = tf.expand_dims(attention_mask, axis=1)
 
-        transformer = TransformerEncoder(num_layers=t_layers, embed_dim=emb_dim,
+        # repeat the mask for the number of times the state embedding is repeated
+
+        emb_state = StateAndPositionEmbedding(input_dim=self.input_state_shape,
+                                              embed_dim=state_emb_dim)
+        emb_state_out = emb_state(input_t, input_states)
+
+        emb_action = StateAndPositionEmbedding(input_dim=self.input_actions_shape,
+                                               embed_dim=action_emb_dim)
+        emb_action_out = emb_action(input_t, input_actions)
+
+        emb_out = tf.concat([emb_state_out, emb_action_out], axis=-1)
+
+        transformer = TransformerEncoder(num_layers=t_layers, embed_dim=state_emb_dim + action_emb_dim,
                                          num_heads=t_num_heads,
                                          ff_dim=t_ff_dim, dropout=t_dropout)
-        transformer_out = transformer(emb_out, training=True, mask=padding_mask)
+        transformer_out = transformer(emb_out, training=True, mask=attention_mask)
 
         # flatten
-        common = keras.layers.Flatten()(transformer_out)
-        # common = keras.layers.GlobalAveragePooling1D()(transformer_out)
-        common = keras.layers.Dense(256, activation=comm_act)(common)
-        common = keras.layers.Dense(256, activation=comm_act)(common)
+        # common = keras.layers.Flatten()(transformer_out)
+        common = keras.layers.GlobalAveragePooling1D()(transformer_out)
         common = keras.layers.Dense(256, activation=comm_act)(common)
         common = keras.layers.Dense(256, activation=comm_act)(common)
         common = keras.layers.Dense(256, activation=comm_act)(common)
@@ -115,7 +133,7 @@ class NeuralNet:
     def get_a2c_activations(self, kwargs):
         common_activation = self.get_activation("common_activation", "elu", kwargs)
         actor_activation = self.get_activation("actor_activation", "elu", kwargs)
-        critic_activation = self.get_activation("critic_activation", "linear", kwargs)
+        critic_activation = self.get_activation("critic_activation", "elu", kwargs)
         return common_activation, actor_activation, critic_activation
 
     def get_activation(self, key, default_val, kwargs):
@@ -141,11 +159,18 @@ def main():
 
     emb_dim = 16
 
-    input_embedding, padding_mask = StateAndPositionEmbedding(input_dim=(1, num_timesteps, num_features),
-                                                              embed_dim=emb_dim)(state)
+    # emb = StateAndPositionEmbedding(input_dim=(1, num_timesteps, num_features), embed_dim=emb_dim)
+    #
+    # positions = tf.range(start=0, limit=num_timesteps, delta=1)
+    # print(positions.shape)
+    # emb_out, padding_mask = emb(positions, state)
+    masking_layer = keras.layers.Masking(mask_value=0.0)
+    mask_states = masking_layer.compute_mask(state)
+    # mask = self.masking_layer(state_embedding)
+    mask_states = tf.cast(mask_states, tf.bool)
+    mask_states = tf.reshape(mask_states, (-1, num_timesteps, 1))
 
-    print(input_embedding)
-    print(padding_mask)
+    print(mask_states)
 
     # position_embedding = keras.layers.Embedding(input_dim=num_timesteps, output_dim=emb_dim)
     # state_embedding = keras.layers.Dense(emb_dim, activation="relu")

@@ -146,7 +146,6 @@ class StateAndPositionEmbedding(keras.layers.Layer):
         self.position_embedding = keras.layers.Embedding(input_dim=self.num_timesteps,
                                                          output_dim=self.embed_dim)
         self.state_embedding = keras.layers.Dense(self.embed_dim, activation="linear")
-        self.masking_layer = keras.layers.Masking(mask_value=0.0)
 
     def get_config(self):
         config = super().get_config()
@@ -156,20 +155,12 @@ class StateAndPositionEmbedding(keras.layers.Layer):
                 "embed_dim"         : self.embed_dim,
                 "position_embedding": self.position_embedding.get_config(),
                 "state_embedding"   : self.state_embedding.get_config(),
-                "masking_layer"     : self.masking_layer.get_config(),
         })
         return config
 
-    def call(self, inputs):
+    def call(self, positions, inputs):
         # embed each timestep
-        pos_encoding = self.position_embedding(tf.range(start=0, limit=self.num_timesteps, delta=1))
+        # pos_encoding = self.position_embedding(tf.range(start=0, limit=self.num_timesteps, delta=1))
+        pos_encoding = self.position_embedding(positions)
         state_embedding = self.state_embedding(inputs)
-
-        mask = self.masking_layer.compute_mask(inputs)
-        # mask = self.masking_layer(state_embedding)
-        mask = tf.cast(mask, tf.bool)
-        mask = tf.reshape(mask, (-1, self.num_timesteps, 1))
-        # repeat the mask for the number of times the state embedding is repeated
-        mask = tf.repeat(mask, self.num_timesteps, axis=2)
-
-        return state_embedding + pos_encoding, mask
+        return state_embedding + pos_encoding
