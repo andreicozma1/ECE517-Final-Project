@@ -40,23 +40,23 @@ class Experiment:
         self.plot_model()
 
         stats = {}
-        episodes_reward: collections.deque = collections.deque(maxlen=running_rew_len)
-        episodes_loss: collections.deque = collections.deque(maxlen=running_rew_len)
+        running_reward: collections.deque = collections.deque(maxlen=running_rew_len)
+        ronning_loss: collections.deque = collections.deque(maxlen=running_rew_len)
 
         tq = tqdm.trange(max_episodes, desc="Train", leave=True)
         for ep in tq:
-            steps, total_reward, loss = self.agent.train_step(self.env, max_steps_per_episode)
-            steps, total_reward, loss = steps.numpy(), total_reward.numpy(), loss.numpy()
-            episodes_reward.append(total_reward)
-            loss = np.sum(loss)
-            episodes_loss.append(loss)
+            rewards, loss = self.agent.train_step(self.env, max_steps_per_episode)
+            rewards, loss = rewards.numpy(), loss.numpy()
+            total_steps, total_reward, total_loss = len(rewards), np.sum(rewards), np.sum(loss)
+            running_reward.append(total_reward)
+            ronning_loss.append(total_loss)
             stats |= {
-                    "steps"         : steps,
-                    "total_reward"  : total_reward,
-                    "running_reward": np.mean(episodes_reward),
-                    "loss"          : loss,
-                    "running_loss"  : np.mean(episodes_loss),
-                    "max_steps"     : max(stats.get("max_steps", 0), steps),
+                    "steps"         : total_steps,
+                    "reward"        : total_reward,
+                    "loss"          : total_loss,
+                    "running_reward": np.mean(running_reward),
+                    "running_loss"  : np.mean(ronning_loss),
+                    "max_steps"     : max(stats.get("max_steps", 0), total_steps),
                     "min_reward"    : min(stats.get("min_reward", inf), total_reward),
                     "max_reward"    : max(stats.get("max_reward", -inf), total_reward),
             }
