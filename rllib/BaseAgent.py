@@ -55,8 +55,6 @@ class BaseAgent:
         return returns
 
     def run_episode(self, env: BaseEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor,
-                                                                                                      tf.Tensor,
-                                                                                                      tf.Tensor,
                                                                                                       Tuple[tf.Tensor,
                                                                                                             tf.Tensor]]:
         self.env: BaseEnvironment = env
