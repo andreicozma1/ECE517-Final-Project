@@ -43,7 +43,7 @@ class A2CAgent(BaseAgent):
 
     def compute_error(self, rewards, extras):
         action_probs, critic_returns = extras
-        actual_returns = self.get_expected_return(rewards)
+        actual_returns = self.expected_return(rewards)
 
         actual_returns = self.standardize(actual_returns)
         critic_returns = self.standardize(critic_returns)

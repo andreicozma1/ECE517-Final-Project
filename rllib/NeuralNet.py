@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 
-from rllib.CustomLayers import ActorCriticLayer, ActorLoss, StateAndPositionEmbedding, TransformerEncoder
+from rllib.CustomLayers import ActorCriticLayer, ActorLoss, StateAndPositionEmbedding, TransformerEncoders
 
 keras = tf.keras
 
@@ -105,9 +105,9 @@ class NeuralNet:
         layer_norm = keras.layers.LayerNormalization()
         layer_norm_out = layer_norm(embs_out)
 
-        transformer = TransformerEncoder(num_layers=t_layers, embed_dim=emb_dim,
-                                         num_heads=t_num_heads,
-                                         ff_dim=t_ff_dim, dropout=t_dropout)
+        transformer = TransformerEncoders(num_layers=t_layers, embed_dim=emb_dim,
+                                          num_heads=t_num_heads,
+                                          ff_dim=t_ff_dim, dropout=t_dropout)
         transformer_out = transformer(layer_norm_out, training=True, mask=attention_mask)
 
         # flatten

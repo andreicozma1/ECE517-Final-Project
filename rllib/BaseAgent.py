@@ -34,8 +34,7 @@ class BaseAgent:
                 "gamma": self.gamma,
         }
 
-    def get_expected_return(self,
-                            rewards: tf.Tensor) -> tf.Tensor:
+    def expected_return(self, rewards: tf.Tensor) -> tf.Tensor:
         """Compute expected returns per timestep."""
 
         n = tf.shape(rewards)[0]
@@ -64,7 +63,6 @@ class BaseAgent:
 
         action_probs_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
         critic_returns_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-
         state_hist = tf.TensorArray(dtype=tf.float32, size=self.nn.max_timesteps,
                                     dynamic_size=True,
                                     element_shape=(self.nn.num_features,))
@@ -122,11 +120,6 @@ class BaseAgent:
             state, reward, done = env.tf_step(action)
             state.set_shape(initial_state_shape)
 
-            # tq.set_postfix({
-            #         'action': int(action),
-            #         'reward': int(reward),
-            # })
-
             rewards = rewards.write(t, reward)
             if tf.cast(done, tf.bool):
                 break
@@ -149,17 +142,11 @@ class BaseAgent:
     def get_action(self, t, state, deterministic):
         pass
 
-    # @abc.abstractmethod
-    # def on_episode_end(self, histories):
-    #     pass
-
     # @tf.function
     def train_step(self, env: BaseEnvironment, max_steps_per_episode: int) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         self.env: BaseEnvironment = env
         with tf.GradientTape() as tape:
             steps, total_reward, rewards, extras = self.run_episode(env, max_steps_per_episode)
-            # rewards, action_probs_hist, critic_returns_hist, steps, total_reward = self.run_episode(env,
-            #                                                                                         max_steps_per_episode)
 
             compute_error_vals = self.compute_error(rewards, extras)
 
