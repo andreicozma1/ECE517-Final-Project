@@ -173,3 +173,16 @@ class BaseAgent:
     @abc.abstractmethod
     def on_update(self, compute_error_vals, tape):
         pass
+
+    def normalize(self, values: tf.Tensor) -> tf.Tensor:
+        c_min = tf.reduce_min(values)
+        c_max = tf.reduce_max(values)
+        c_range = c_max - c_min
+        values = (values - c_min) / c_range
+        return values
+
+    def standardize(self, values: tf.Tensor) -> tf.Tensor:
+        mean = tf.reduce_mean(values)
+        std = tf.math.reduce_std(values)
+        values = (values - mean) / std
+        return values

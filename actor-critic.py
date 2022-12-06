@@ -1,11 +1,9 @@
 import logging
-import os
 import pprint
 import random
 from typing import Tuple
 
 import numpy as np
-import pygame
 import tensorflow as tf
 
 # This is a hacky fix for tensorflow imports to work with intellisense
@@ -42,19 +40,6 @@ class A2CAgent(BaseAgent):
         self.critic_loss_multiplier = critic_loss_multiplier
         self.entropy_loss_multiplier = entropy_loss_multiplier
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
-
-    def normalize(self, values):
-        c_min = tf.reduce_min(values)
-        c_max = tf.reduce_max(values)
-        c_range = c_max - c_min
-        values = (values - c_min) / c_range
-        return values
-
-    def standardize(self, values):
-        mean = tf.reduce_mean(values)
-        std = tf.math.reduce_std(values)
-        values = (values - mean) / std
-        return values
 
     def compute_error(self, rewards, extras):
         action_probs, critic_returns = extras
