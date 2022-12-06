@@ -12,7 +12,7 @@ import tensorflow as tf
 import wandb
 
 from BaseAgent import BaseAgent
-from Environment import PongEnvironment
+from Environments import PongEnvironment
 from BaseEnvironment import BaseEnvironment
 
 
