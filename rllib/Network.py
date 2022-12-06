@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import os
 import pprint
 
 import numpy as np
@@ -12,7 +13,7 @@ from rllib.CustomLayers import ActorCriticLayer, ActorLoss, StateAndPositionEmbe
 keras = tf.keras
 
 
-class NeuralNet:
+class Network:
     def __init__(self, name: str, num_states: int, num_actions: int,
                  max_timesteps: int = 1,
                  learning_rate: float = 0.0001,
@@ -27,20 +28,21 @@ class NeuralNet:
         self.input_actions_shape = (1, self.max_timesteps, self.num_actions)
         self.kwargs = kwargs
         self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_model(name, **kwargs)
+        self.model_config = self.model.to_json()
+        self.model_config_hash = hashlib.md5(json.dumps(json.loads(self.model_config)).encode('utf-8')).hexdigest()
+        self.path_network = os.path.join("saves", "networks", self.model_config_hash)
+        os.makedirs(self.path_network, exist_ok=True)
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     @property
     def config(self):
-        config = self.model.to_json()
-        config_str = json.dumps(json.loads(config))
-        config_hash = hashlib.md5(config_str.encode('utf-8')).hexdigest()
         return {
                 "name"       : self.name,
                 "kwargs"     : self.kwargs,
                 "num_layers" : len(self.model.layers),
                 "num_params" : self.model.count_params(),
-                "config"     : config,
-                "config_hash": config_hash,
+                "config"     : self.model_config,
+                "config_hash": self.model_config_hash,
                 "critic_loss": self.critic_loss.__class__.__name__,
                 "actor_loss" : self.actor_loss.__class__.__name__,
         }

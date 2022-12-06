@@ -10,7 +10,7 @@ import tensorflow as tf
 from rllib.BaseAgent import BaseAgent
 from rllib.Environments import LunarLander
 from rllib.Experiment import Experiment
-from rllib.NeuralNet import NeuralNet
+from rllib.Network import Network
 from rllib.PlotHelper import PlotHelper
 from rllib.utils import logging_setup
 
@@ -29,7 +29,7 @@ random.seed(seed)
 
 class A2CAgent(BaseAgent):
 
-    def __init__(self, nn: NeuralNet,
+    def __init__(self, nn: Network,
                  gamma: float = 0.97,
                  actor_loss_multiplier: float = 0.5,
                  critic_loss_multiplier: float = 1.0,
@@ -195,9 +195,9 @@ def main():
     # env = PongEnvironment(draw=True, draw_speed=None, state_scaler_enable=True)
     env = LunarLander(draw=True, draw_speed=None, state_scaler_enable=True)
 
-    nn = NeuralNet("transformer",
-                   env.num_states, env.num_actions,
-                   max_timesteps=25, learning_rate=0.000001)
+    nn = Network("transformer",
+                 env.num_states, env.num_actions,
+                 max_timesteps=25, learning_rate=0.000001)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent, use_wandb=False)

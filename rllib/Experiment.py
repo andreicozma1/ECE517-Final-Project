@@ -84,7 +84,7 @@ class Experiment:
         if not os.path.splitext(filename)[1]:
             filename += ".png"
 
-        filename = os.path.join(self.save_path, filename)
+        filename = os.path.join(self.agent.nn.path_network, filename)
         tf.keras.utils.plot_model(self.agent.nn.model,
                                   to_file=filename,
                                   show_layer_names=True,

@@ -24,7 +24,7 @@
         action = keras.layers.Dense(self.n_actions, activation="softmax")(common)
         critic = keras.layers.Dense(1)(common)
 
-        model = keras.NeuralNet(inputs=inputs, outputs=[action, critic])
+        model = keras.Network(inputs=inputs, outputs=[action, critic])
         optimizer = keras.optimizers.Adam(learning_rate=0.001)
         # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
         # optimizer = tfa.optimizers.AdamW(
@@ -60,7 +60,7 @@
         action = keras.layers.Dense(self.n_actions, activation="softmax")(common)
         critic = keras.layers.Dense(1)(common)
 
-        model = keras.NeuralNet(inputs=inputs, outputs=[action, critic])
+        model = keras.Network(inputs=inputs, outputs=[action, critic])
         optimizer = keras.optimizers.Adam(learning_rate=0.001)
         # optimizer = keras.optimizers.Nadam(learning_rate=0.001)
         # optimizer = tfa.optimizers.AdamW(

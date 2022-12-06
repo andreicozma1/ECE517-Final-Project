@@ -23,17 +23,17 @@
 
             return keras.backend.sum(-log_lik * advantage)
 
-        actor = keras.models.NeuralNet(
+        actor = keras.models.Network(
             inputs=[input, advantage], outputs=[probs], name="actor"
         )
         actor_opt = keras.optimizers.Adam(lr=self.lr)
         actor.compile(optimizer=actor_opt, loss=custom_loss)
 
-        critic = keras.models.NeuralNet(inputs=[input], outputs=[values], name="critic")
+        critic = keras.models.Network(inputs=[input], outputs=[values], name="critic")
         critic_opt = keras.optimizers.Adam(lr=self.entropy_loss_multiplier)
         critic_loss = keras.losses.MeanSquaredError()
         critic.compile(optimizer=critic_opt, loss=critic_loss)
 
-        policy = keras.models.NeuralNet(inputs=[input], outputs=[probs], name="policy")
+        policy = keras.models.Network(inputs=[input], outputs=[probs], name="policy")
 
         return actor, critic, policy
