@@ -215,9 +215,9 @@ def main():
                    max_timesteps=25, learning_rate=0.000001)
     agent = A2CAgent(nn)
 
-    exp = Experiment(env, agent)
+    exp = Experiment(env, agent, use_wandb=False)
 
-    exp.run_experiment(use_wandb=False)
+    exp.run_experiment()
     exp.run_test()
 
 
