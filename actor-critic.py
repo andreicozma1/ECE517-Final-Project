@@ -7,7 +7,7 @@ from typing import Tuple
 import numpy as np
 import pygame
 import tensorflow as tf
-from PongEnvironment import LunarLander, PongEnvironment
+from Environment import LunarLander, PongEnvironment
 from Experiment import Experiment
 from NeuralNet import NeuralNet
 from BaseAgent import BaseAgent

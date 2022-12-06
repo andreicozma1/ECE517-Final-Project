@@ -7,7 +7,7 @@ from typing import Tuple
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute()))
 from BaseAgent import BaseAgent
-from PongEnvironment import PongEnvironment
+from Environment import PongEnvironment
 from utils import logging_setup
 
 

@@ -1,16 +1,13 @@
 import abc
-import collections
 import logging
 import os
 import pprint
 from typing import Any, List, Tuple
 
-import gymnasium
+import joblib
 import numpy as np
 import tensorflow as tf
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-import joblib
-from rlenv import pongGame
+from sklearn.preprocessing import MinMaxScaler
 
 
 class BaseEnvironment:
@@ -22,9 +19,8 @@ class BaseEnvironment:
                  state_scaling: bool = True,
                  append_n_actions: int = 0):
         self.name: str = name
-        self.num_states: int = num_states + append_n_actions
+        self.num_states: int = num_states
         self.num_actions: int = num_actions
-        self.append_n_actions: int = append_n_actions
         self.save_path_root: str = base_folder
         self.state_scaler_enable: bool = state_scaling
         self.save_path_env: str = os.path.join(self.save_path_root, self.name)
@@ -32,8 +28,6 @@ class BaseEnvironment:
 
         self.state_scaler, self.state_scaler_path = None, os.path.join(self.save_path_env, "state_scaler.pkl")
         self.load_scaler()
-        self.last_n_actions: collections.deque = collections.deque(maxlen=append_n_actions)
-        self.last_n_actions.extend([0] * append_n_actions)
 
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
@@ -82,9 +76,7 @@ class BaseEnvironment:
 
     def step(self, action) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         state, reward, done = self._step(action)
-        state = np.append(state, self.last_n_actions)
         state = self.transform_state(state)
-        self.last_n_actions.append(action)
         return state.astype(np.float32), np.array(reward, np.float32), np.array(done, np.int32)
 
     def tf_reset(self) -> tf.Tensor:
@@ -96,8 +88,6 @@ class BaseEnvironment:
 
     def reset(self) -> np.ndarray:
         state = self._reset()
-        self.last_n_actions.extend([0] * self.append_n_actions)
-        state = np.append(state, self.last_n_actions)
         state = self.transform_state(state)
         joblib.dump(self.state_scaler, self.state_scaler_path)
         return np.array(state, dtype=np.float32)
@@ -105,41 +95,3 @@ class BaseEnvironment:
     # @tf.autograph.experimental.do_not_convert
     # def save_scaler(self):
     # joblib.dump(self.state_scaler, self.save_path_env_scaler)
-
-
-class PongEnvironment(BaseEnvironment):
-    def __init__(self, draw=False, draw_speed=None, state_scaler_enable=True):
-        self._game = pongGame(200, 200, draw=draw, draw_speed=draw_speed)
-        num_states, num_actions = self._game.getState().shape[0], 3
-        super().__init__(name='Pong', num_states=num_states, num_actions=num_actions, state_scaling=state_scaler_enable)
-
-    def _step(self, action: np.ndarray) -> Tuple[Any, float, bool]:
-        reward = self._game.takeAction(action, reward_step=1, reward_hit=15)
-        done = reward in [-100, 100]
-        state = self._game.getState()
-        return state, reward, done
-
-    def _reset(self):
-        self._game.reset()
-        return self._game.getState()
-
-
-class LunarLander(BaseEnvironment):
-    def __init__(self, draw=False, draw_speed=None, state_scaler_enable=True):
-        self.draw, self.draw_speed = draw, draw_speed
-        self._env = gymnasium.make("LunarLander-v2", render_mode="human" if draw else None)
-        self._env.reset(seed=42)
-        num_states, num_actions = self._env.observation_space.shape[0], self._env.action_space.n
-        super().__init__(name='LunarLander',
-                         num_states=num_states,
-                         num_actions=num_actions,
-                         state_scaling=state_scaler_enable)
-
-    def _step(self, action: np.ndarray) -> Tuple[Any, float, bool]:
-        state, reward, terminated, truncated, _ = self._env.step(action)
-        done = terminated or truncated
-        return state, reward, done
-
-    def _reset(self):
-        state, _ = self._env.reset()
-        return state

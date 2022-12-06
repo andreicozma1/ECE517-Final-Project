@@ -10,7 +10,8 @@ from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from tqdm import tqdm
 
-from PongEnvironment import BaseEnvironment, PongEnvironment
+from Environment import PongEnvironment
+from BaseEnvironment import BaseEnvironment
 from NeuralNet import NeuralNet
 
 keras = tf.keras

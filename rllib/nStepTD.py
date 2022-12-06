@@ -9,7 +9,7 @@ import numpy as np
 # print(pathlib.Path(__file__).parent.parent.absolute())
 sys.path.append(str(pathlib.Path(__file__).parent.parent.absolute()))
 from TabularAgent import TabularAgent
-from PongEnvironment import PongEnvironment
+from Environment import PongEnvironment
 from Experiment import Experiment
 from utils import logging_setup
 
