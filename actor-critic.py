@@ -1,5 +1,7 @@
 import logging
 import os
+import pprint
+import random
 from typing import Tuple
 
 import numpy as np
@@ -16,24 +18,29 @@ from rllib.utils import logging_setup
 # Logging to stdout and file with logging class
 
 log = logging_setup(file=__file__, name=__name__, level=logging.INFO)
-os.environ['WANDB_SILENT'] = "true"
-
+# os.environ['WANDB_SILENT'] = "true"
 
 # Set seed for experiment reproducibility
-# seed = 42
-#
-# tf.random.set_seed(seed)
-# np.random.seed(seed)
-# random.seed(seed)
+seed = 42
+
+tf.random.set_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
 
 
 class A2CAgent(BaseAgent):
 
-    def __init__(self, nn: NeuralNet, gamma: float):
+    def __init__(self, nn: NeuralNet,
+                 gamma: float = 0.97,
+                 actor_loss_multiplier: float = 1.0,
+                 critic_loss_multiplier: float = 0.5,
+                 entropy_loss_multiplier: float = 0.05,
+                 ):
         super().__init__(nn=nn, gamma=gamma)
-        self.actor_loss_multiplier = 1.0
-        self.critic_loss_multiplier = 0.1
-        # self.nn: NeuralNet = nn
+        self.actor_loss_multiplier = actor_loss_multiplier
+        self.critic_loss_multiplier = critic_loss_multiplier
+        self.entropy_loss_multiplier = entropy_loss_multiplier
+        logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def normalize(self, values):
         c_min = tf.reduce_min(values)
@@ -52,8 +59,8 @@ class A2CAgent(BaseAgent):
         action_probs, critic_returns = extras
         actual_returns = self.get_expected_return(rewards)
 
-        actual_returns = self.normalize(actual_returns)
-        critic_returns = self.normalize(critic_returns)
+        # actual_returns = self.standardize(actual_returns)
+        # critic_returns = self.standardize(critic_returns)
 
         action_probs = tf.reshape(action_probs, shape=(-1, 1))
         critic_returns = tf.reshape(critic_returns, shape=(-1, 1))
@@ -65,6 +72,11 @@ class A2CAgent(BaseAgent):
 
         return loss
 
+    def get_entropy_loss(self, action_probs: tf.Tensor) -> tf.Tensor:
+        entropy_loss = tf.math.multiply(action_probs, tf.math.log(action_probs))
+        entropy_loss = -1 * tf.reduce_sum(entropy_loss, axis=-1)
+        return entropy_loss
+
     def compute_loss(self,
                      action_probs: tf.Tensor,
                      critic_returns: tf.Tensor,
@@ -72,33 +84,29 @@ class A2CAgent(BaseAgent):
         """Computes the combined Actor-Critic loss."""
         if self.nn.critic_loss is None:
             raise ValueError("Loss is None")
-        # create multipliers for actor and critic losses
-
         # If action is better than average, the advantage function is positive,
         # if worse, it is negative.
         advantage = actual_returns - critic_returns
 
-        actor_losses = actor_loss_multiplier * self.nn.actor_loss(advantage, action_probs)
-        actor_losses = tf.reduce_sum(actor_losses, axis=1)
-        actor_losses = self.normalize(actor_losses)
+        actor_losses = self.nn.actor_loss(action_probs, advantage)
+        # actor_losses = self.standardize(actor_losses)
+        actor_losses = tf.math.multiply(actor_losses, self.actor_loss_multiplier)
 
-        # critic_loss = huber_loss(critic_values, actual_returns) <- Example says this
-        # critic_loss = huber_loss(y_true, y_pred) <- This is what the docs say
-        # Hmmmmm
-        critic_losses = critic_loss_multiplier * self.nn.critic_loss(critic_returns, actual_returns)
-        critic_losses = self.normalize(critic_losses)
+        entropy_loss = self.get_entropy_loss(action_probs)
+        # entropy_loss = self.standardize(entropy_loss)
+        entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
 
-        # calculate entropy loss
-        # this is a regularization term that encourages the policy to be more exploratory
-        entropy_loss = tf.math.multiply(action_probs, -tf.math.log(action_probs)) * 0.01
+        critic_losses = self.nn.critic_loss(critic_returns, actual_returns)
+        # critic_losses = self.standardize(critic_losses)
+        critic_losses = tf.math.multiply(critic_losses, self.critic_loss_multiplier)
 
-        total_losses = actor_losses + critic_losses
+        total_losses = tf.math.add(actor_losses, critic_losses, entropy_loss)
 
-        final_loss = tf.reduce_sum(total_losses)
+        loss = tf.reduce_sum(total_losses)
 
-        self.plot_loss(actor_losses, critic_losses, entropy_loss, total_losses)
+        self.plot_loss(actor_losses, critic_losses, total_losses, entropy_loss=entropy_loss)
 
-        return final_loss, advantage
+        return loss, advantage
 
     def on_update(self, loss, tape):
         # Compute the gradients from the loss
@@ -151,11 +159,11 @@ class A2CAgent(BaseAgent):
                 "suptitle"    : f"A2C Returns ({self.env.name}): "
                                 f"{self.nn.name} - {self.nn.input_shape}" +
                                 f" + ({self.env.state_scaler.__class__.__name__})"
-                if self.env.state_scaling is True else "",
+                if self.env.state_scaler_enable is True else "",
         }
         PlotHelper.plot_from_dict(plot_returns, savefig="plots/a2c_returns.pdf")
 
-    def plot_loss(self, actor_losses, critic_losses, entropy_loss, total_losses):
+    def plot_loss(self, actor_losses, critic_losses, total_losses, entropy_loss=None):
         plot_losses = {
                 "plot"   : [
                         {
@@ -172,12 +180,7 @@ class A2CAgent(BaseAgent):
                                 "args" : [total_losses],
                                 "label": "Total Loss",
                                 "color": "black"
-                        },
-                        {
-                                "args" : [tf.squeeze(entropy_loss)],
-                                "label": "Entropy",
-                                "color": "darkorange"
-                        },
+                        }
 
                 ],
                 "axhline": [
@@ -192,17 +195,24 @@ class A2CAgent(BaseAgent):
                            f"{self.nn.optimizer.__class__.__name__} - "
                            f"LR: {self.nn.learning_rate}",
         }
+        if entropy_loss is not None:
+            plot_losses["plot"].append({
+                    "args" : [tf.squeeze(entropy_loss)],
+                    "label": "Entropy Loss",
+                    "color": "darkorange"
+            })
+
         PlotHelper.plot_from_dict(plot_losses, savefig="plots/a2c_losses.pdf")
 
 
 def main():
     # env = PongEnvironment(draw=True, draw_speed=None)
-    env = LunarLander(draw=False, draw_speed=None, state_scaling=True)
+    env = LunarLander(draw=False, draw_speed=None, state_scaler_enable=True)
 
     nn = NeuralNet("transformer",
                    env.num_states, env.num_actions,
-                   max_timesteps=25, learning_rate=0.001)
-    agent = A2CAgent(nn, gamma=0.97)
+                   max_timesteps=50, learning_rate=0.0000001)
+    agent = A2CAgent(nn)
 
     exp = Experiment(env, agent)
 

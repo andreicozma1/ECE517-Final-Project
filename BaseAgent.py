@@ -23,9 +23,6 @@ class BaseAgent:
         self.env = None
         self.nn: NeuralNet = nn
         self.gamma: float = gamma
-        self.global_episode: int = 0
-        self.return_scaler = MinMaxScaler(feature_range=(0, 1))
-        # self.return_scaler = StandardScaler()
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     @property
@@ -34,12 +31,12 @@ class BaseAgent:
             raise ValueError("Environment not set")
         return self.env.save_path_env
 
-    def tf_scale(self, returns) -> tf.Tensor:
-        return tf.numpy_function(self.scale, [returns], tf.float32)
-
-    def scale(self, returns) -> np.ndarray:
-        self.return_scaler.partial_fit(returns)
-        return self.return_scaler.transform(returns)
+    @property
+    def config(self):
+        return {
+                "nn"   : self.nn.config,
+                "gamma": self.gamma,
+        }
 
     def get_expected_return(self,
                             rewards: tf.Tensor) -> tf.Tensor:

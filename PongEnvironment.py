@@ -23,29 +23,41 @@ class BaseEnvironment:
         self.num_states: int = num_states
         self.num_actions: int = num_actions
         self.save_path_root: str = base_folder
-        self.state_scaling: bool = state_scaling
+        self.state_scaler_enable: bool = state_scaling
         self.save_path_env: str = os.path.join(self.save_path_root, self.name)
         os.makedirs(self.save_path_env, exist_ok=True)
 
-        self.state_scaler, self.save_path_env_scaler = None, os.path.join(self.save_path_env, "state_scaler.pkl")
+        self.state_scaler, self.state_scaler_path = None, os.path.join(self.save_path_env, "state_scaler.pkl")
         self.load_scaler()
 
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
+    @property
+    def config(self) -> dict:
+        return {
+                "name"               : self.name,
+                "num_states"         : self.num_states,
+                "num_actions"        : self.num_actions,
+                "save_path_env"      : self.save_path_env,
+                "state_scaler_enable": self.state_scaler_enable,
+                "state_scaler"       : self.state_scaler.__class__.__name__,
+                "state_scaler_path"  : self.state_scaler_path,
+        }
+
     def load_scaler(self):
-        if os.path.isfile(self.save_path_env_scaler):
-            logging.info(f"Loading state scaler from {self.save_path_env_scaler}")
-            self.state_scaler = joblib.load(self.save_path_env_scaler)
+        if os.path.isfile(self.state_scaler_path):
+            logging.info(f"Loading state scaler from {self.state_scaler_path}")
+            self.state_scaler = joblib.load(self.state_scaler_path)
         else:
             self.reset_scaler()
 
     def reset_scaler(self):
         logging.warning("Creating new state scaler")
-        self.state_scaler = MinMaxScaler(feature_range=(0, 1))
-        # self.state_scaler = StandardScaler()
+        # self.state_scaler = MinMaxScaler(feature_range=(0, 1))
+        self.state_scaler = StandardScaler()
 
     def transform_state(self, state):
-        if self.state_scaling:
+        if self.state_scaler_enable:
             state = state.reshape(1, self.num_states)
             try:
                 self.state_scaler.partial_fit(state)
@@ -78,7 +90,7 @@ class BaseEnvironment:
     def reset(self) -> np.ndarray:
         state = self._reset()
         state = self.transform_state(state)
-        joblib.dump(self.state_scaler, self.save_path_env_scaler)
+        joblib.dump(self.state_scaler, self.state_scaler_path)
         return np.array(state, dtype=np.float32)
 
     # @tf.autograph.experimental.do_not_convert
@@ -87,10 +99,10 @@ class BaseEnvironment:
 
 
 class PongEnvironment(BaseEnvironment):
-    def __init__(self, draw=False, draw_speed=None, state_scaling=True):
+    def __init__(self, draw=False, draw_speed=None, state_scaler_enable=True):
         self._game = pongGame(200, 200, draw=draw, draw_speed=draw_speed)
         num_states, num_actions = self._game.getState().shape[0], 3
-        super().__init__(name='Pong', num_states=num_states, num_actions=num_actions, state_scaling=state_scaling)
+        super().__init__(name='Pong', num_states=num_states, num_actions=num_actions, state_scaling=state_scaler_enable)
 
     def _step(self, action: np.ndarray) -> Tuple[Any, float, bool]:
         reward = self._game.takeAction(action, reward_step=1, reward_hit=15)
@@ -104,14 +116,15 @@ class PongEnvironment(BaseEnvironment):
 
 
 class LunarLander(BaseEnvironment):
-    def __init__(self, draw=False, draw_speed=None, state_scaling=True):
+    def __init__(self, draw=False, draw_speed=None, state_scaler_enable=True):
         self.draw, self.draw_speed = draw, draw_speed
         self._env = gymnasium.make("LunarLander-v2", render_mode="human" if draw else None)
+        self._env.reset(seed=42)
         num_states, num_actions = self._env.observation_space.shape[0], self._env.action_space.n
         super().__init__(name='LunarLander',
                          num_states=num_states,
                          num_actions=num_actions,
-                         state_scaling=state_scaling)
+                         state_scaling=state_scaler_enable)
 
     def _step(self, action: np.ndarray) -> Tuple[Any, float, bool]:
         state, reward, terminated, truncated, _ = self._env.step(action)

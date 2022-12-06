@@ -30,7 +30,7 @@
         actor.compile(optimizer=actor_opt, loss=custom_loss)
 
         critic = keras.models.NeuralNet(inputs=[input], outputs=[values], name="critic")
-        critic_opt = keras.optimizers.Adam(lr=self.beta)
+        critic_opt = keras.optimizers.Adam(lr=self.entropy_loss_multiplier)
         critic_loss = keras.losses.MeanSquaredError()
         critic.compile(optimizer=critic_opt, loss=critic_loss)
 

@@ -1,3 +1,5 @@
+import hashlib
+import json
 import logging
 import pprint
 
@@ -22,13 +24,30 @@ class NeuralNet:
         self.learning_rate: float = learning_rate
         self.max_timesteps: int = max_timesteps
         self.input_shape = (1, self.max_timesteps, self.num_features)
-        self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_a2c_model(name, **kwargs)
+        self.kwargs = kwargs
+        self.model, self.optimizer, self.critic_loss, self.actor_loss = self.create_model(name, **kwargs)
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
-    def create_a2c_model(self, model_name: str, **kwargs):
+    @property
+    def config(self):
+        config = self.model.to_json()
+        config_str = json.dumps(json.loads(config))
+        config_hash = hashlib.md5(config_str.encode('utf-8')).hexdigest()
+        return {
+                "name"       : self.name,
+                "kwargs"     : self.kwargs,
+                "num_layers" : len(self.model.layers),
+                "num_params" : self.model.count_params(),
+                "config"     : config,
+                "config_hash": config_hash,
+                "critic_loss": self.critic_loss.__class__.__name__,
+                "actor_loss" : self.actor_loss.__class__.__name__,
+        }
+
+    def create_model(self, model_name: str, **kwargs):
         logging.info(f"Model: {model_name}")
         logging.info(f"kwargs: {pprint.pformat(kwargs)}")
-        c_final_act = self.get_activation("linear", kwargs)
+        c_final_act = self.get_activation("c_final_act", "linear", kwargs)
 
         inputs = keras.layers.Input(batch_input_shape=self.input_shape, name="input")
 
@@ -40,33 +59,20 @@ class NeuralNet:
         model = keras.Model(inputs=inputs, outputs=ac_outputs, name=model_name)
         model.summary()
 
-        # config = model.get_config()
-        # config_hash = hashlib.md5(json.dumps(config).encode('utf-8')).hexdigest()
-        # self._config.update({
-        #         "model": {
-        #                 "name"       : model_name,
-        #                 "kwargs"     : kwargs,
-        #                 "num_layers" : len(model.layers),
-        #                 "num_params" : model.count_params(),
-        #                 "config"     : config,
-        #                 "config_hash": config_hash
-        #         }
-        # })
-
         ###################################################################
         # OPTIMIZER
-        optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
+        # optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
         # optimizer = keras.optimizers.Nadam(learning_rate=self.learning_rate)
         # optimizer = tfa.optimizers.AdamW(
         #         learning_rate=self.learning_rate, weight_decay=0.000005, amsgrad=True
         # )
-        # optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
+        optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
 
         ###################################################################
         # LOSS
         # critic_loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
         critic_loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
-        actor_loss = ActorLoss()
+        actor_loss = ActorLoss(reduction=tf.keras.losses.Reduction.NONE)
 
         return model, optimizer, critic_loss, actor_loss
 
@@ -74,10 +80,10 @@ class NeuralNet:
         comm_act, a_act, c_act = self.get_a2c_activations(kwargs)
 
         emb_dim = 128
-        t_layers = 3
+        t_layers = 1
         t_num_heads = 10
         t_dropout = 0.1
-        t_ff_dim = [256, 256, 256]
+        t_ff_dim = [512, 512, 512, 512, 512]
 
         emb = StateAndPositionEmbedding(input_dim=self.input_shape,
                                         embed_dim=emb_dim)
@@ -88,33 +94,37 @@ class NeuralNet:
                                          ff_dim=t_ff_dim, dropout=t_dropout)
         transformer_out = transformer(emb_out, training=True, mask=padding_mask)
 
-        # global average pooling
-        common = keras.layers.GlobalAveragePooling1D()(transformer_out)
-        common = keras.layers.Dense(128, activation=comm_act)(common)
-        common = keras.layers.Dense(128, activation=comm_act)(common)
-        common = keras.layers.Dense(128, activation=comm_act)(common)
-        common = keras.layers.Dense(128, activation=comm_act)(common)
+        # flatten
+        common = keras.layers.Flatten()(transformer_out)
+        # common = keras.layers.GlobalAveragePooling1D()(transformer_out)
+        common = keras.layers.Dense(512, activation=comm_act)(common)
+        common = keras.layers.Dense(512, activation=comm_act)(common)
+        common = keras.layers.Dense(512, activation=comm_act)(common)
+        common = keras.layers.Dense(512, activation=comm_act)(common)
+        common = keras.layers.Dense(512, activation=comm_act)(common)
+        common = keras.layers.Dense(512, activation=comm_act)(common)
 
-        actor_inp = keras.layers.Dense(128, activation=a_act)(common)
-        actor_inp = keras.layers.Dense(128, activation=a_act)(actor_inp)
+        actor_inp = keras.layers.Dense(64, activation=a_act)(common)
+        actor_inp = keras.layers.Dense(64, activation=a_act)(actor_inp)
 
-        critic_inp = keras.layers.Dense(128, activation=c_act)(common)
-        critic_inp = keras.layers.Dense(128, activation=c_act)(critic_inp)
+        critic_inp = keras.layers.Dense(64, activation=c_act)(common)
+        critic_inp = keras.layers.Dense(64, activation=c_act)(critic_inp)
 
         return actor_inp, critic_inp
 
     def get_a2c_activations(self, kwargs):
-        common_activation = self.get_activation("relu", kwargs)
-        actor_activation = self.get_activation("relu", kwargs)
-        critic_activation = self.get_activation("relu", kwargs)
+        common_activation = self.get_activation("common_activation", "elu", kwargs)
+        actor_activation = self.get_activation("actor_activation", "elu", kwargs)
+        critic_activation = self.get_activation("critic_activation", "linear", kwargs)
         return common_activation, actor_activation, critic_activation
 
-    def get_activation(self, act, kwargs):
-        if "common_activation" in kwargs:
-            act = kwargs["common_activation"]
-        if act == "leaky_relu":
-            act = keras.layers.LeakyReLU()
-        return act
+    def get_activation(self, key, default_val, kwargs):
+        val = default_val
+        if key in kwargs:
+            val = kwargs[key]
+        if val == "leaky_relu":
+            val = keras.layers.LeakyReLU()
+        return val
 
 
 def main():

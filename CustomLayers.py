@@ -33,9 +33,14 @@ class ActorLoss(tf.keras.losses.Loss):
     def __init__(self, name='actor_loss', reduction=tf.keras.losses.Reduction.NONE, **kwargs):
         super().__init__(name=name, reduction=reduction, **kwargs)
 
-    def call(self, advantage, action_probs):
-        action_log_probs = -tf.math.log(action_probs)
-        return tf.math.multiply(action_log_probs, advantage)
+    def get_config(self):
+        config = super().get_config()
+        return config
+
+    def call(self, action_probs: tf.Tensor, advantage: tf.Tensor):
+        advantage_probs = tf.math.multiply(advantage, tf.math.log(action_probs))
+        advantage_probs = -tf.math.reduce_sum(advantage_probs, axis=-1)
+        return advantage_probs
 
 
 class TransformerEncoderBlock(keras.layers.Layer):
@@ -140,7 +145,7 @@ class StateAndPositionEmbedding(keras.layers.Layer):
 
         self.position_embedding = keras.layers.Embedding(input_dim=self.num_timesteps,
                                                          output_dim=self.embed_dim)
-        self.state_embedding = keras.layers.Dense(self.embed_dim, activation="relu")
+        self.state_embedding = keras.layers.Dense(self.embed_dim, activation="linear")
         self.masking_layer = keras.layers.Masking(mask_value=0.0)
 
     def get_config(self):
@@ -151,6 +156,7 @@ class StateAndPositionEmbedding(keras.layers.Layer):
                 "embed_dim"         : self.embed_dim,
                 "position_embedding": self.position_embedding.get_config(),
                 "state_embedding"   : self.state_embedding.get_config(),
+                "masking_layer"     : self.masking_layer.get_config(),
         })
         return config
 
