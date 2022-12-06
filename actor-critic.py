@@ -59,8 +59,8 @@ class A2CAgent(BaseAgent):
         action_probs, critic_returns = extras
         actual_returns = self.get_expected_return(rewards)
 
-        # actual_returns = self.standardize(actual_returns)
-        # critic_returns = self.standardize(critic_returns)
+        actual_returns = self.standardize(actual_returns)
+        critic_returns = self.standardize(critic_returns)
 
         action_probs = tf.reshape(action_probs, shape=(-1, 1))
         critic_returns = tf.reshape(critic_returns, shape=(-1, 1))
@@ -206,12 +206,12 @@ class A2CAgent(BaseAgent):
 
 
 def main():
-    # env = PongEnvironment(draw=True, draw_speed=None)
-    env = LunarLander(draw=False, draw_speed=None, state_scaler_enable=True)
+    # env = PongEnvironment(draw=True, draw_speed=None, state_scaler_enable=True)
+    env = LunarLander(draw=True, draw_speed=None, state_scaler_enable=True)
 
     nn = NeuralNet("transformer",
                    env.num_states, env.num_actions,
-                   max_timesteps=50, learning_rate=0.0000001)
+                   max_timesteps=50, learning_rate=0.00001)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent)

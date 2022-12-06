@@ -79,11 +79,11 @@ class NeuralNet:
     def inner_transformer(self, inputs, **kwargs):
         comm_act, a_act, c_act = self.get_a2c_activations(kwargs)
 
-        emb_dim = 128
+        emb_dim = 64
         t_layers = 1
         t_num_heads = 10
         t_dropout = 0.1
-        t_ff_dim = [512, 512, 512, 512, 512]
+        t_ff_dim = [256, 256, 256, 256, 256]
 
         emb = StateAndPositionEmbedding(input_dim=self.input_shape,
                                         embed_dim=emb_dim)
@@ -97,12 +97,12 @@ class NeuralNet:
         # flatten
         common = keras.layers.Flatten()(transformer_out)
         # common = keras.layers.GlobalAveragePooling1D()(transformer_out)
-        common = keras.layers.Dense(512, activation=comm_act)(common)
-        common = keras.layers.Dense(512, activation=comm_act)(common)
-        common = keras.layers.Dense(512, activation=comm_act)(common)
-        common = keras.layers.Dense(512, activation=comm_act)(common)
-        common = keras.layers.Dense(512, activation=comm_act)(common)
-        common = keras.layers.Dense(512, activation=comm_act)(common)
+        common = keras.layers.Dense(256, activation=comm_act)(common)
+        common = keras.layers.Dense(256, activation=comm_act)(common)
+        common = keras.layers.Dense(256, activation=comm_act)(common)
+        common = keras.layers.Dense(256, activation=comm_act)(common)
+        common = keras.layers.Dense(256, activation=comm_act)(common)
+        common = keras.layers.Dense(256, activation=comm_act)(common)
 
         actor_inp = keras.layers.Dense(64, activation=a_act)(common)
         actor_inp = keras.layers.Dense(64, activation=a_act)(actor_inp)
