@@ -49,8 +49,8 @@ class DecisionTransformer(tf.keras.layers.Layer):
 
         self.embed_timestep = tf.keras.layers.Embedding(max_ep_len, hidden_size)
         self.embed_return = tf.keras.layers.Dense(self.hidden_size, input_shape=(None, 1))
-        self.embed_return = tf.keras.layers.Dense(self.hidden_size, input_shape=(None, self.state_dim))
-        self.embed_return = tf.keras.layers.Dense(self.hidden_size, input_shape=(None, self.act_dim))
+        self.embed_state = tf.keras.layers.Dense(self.hidden_size, input_shape=(None, self.state_dim))
+        self.embed_action = tf.keras.layers.Dense(self.hidden_size, input_shape=(None, self.act_dim))
 
         # check params
         self.embed_ln = tf.keras.layers.LayerNormalization(axis=-1, scale=True, center=True)
