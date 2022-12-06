@@ -125,16 +125,19 @@ class BaseAgent:
 
         return rewards, (action_probs_hist, critic_returns_hist)
 
-    def get_model_inputs(self, t, state_hist, actions_hist):
+    def get_model_inputs(self, curr_timestep, state_hist, actions_hist):
+        positions = tf.range(start=curr_timestep - self.nn.max_timesteps + 1, limit=curr_timestep + 1, delta=1)
+        positions = tf.clip_by_value(positions, 0, curr_timestep)
+        positions = tf.reshape(positions, self.nn.input_t_shape)
+
         states = state_hist.stack()
         states = states[-self.nn.max_timesteps:, :]
         states = tf.reshape(states, self.nn.input_state_shape)
+
         actions = actions_hist.stack()
         actions = actions[-self.nn.max_timesteps:, :]
         actions = tf.reshape(actions, self.nn.input_actions_shape)
-        positions = tf.range(start=t - self.nn.max_timesteps + 1, limit=t + 1, delta=1)
-        positions = tf.clip_by_value(positions, 0, t)
-        positions = tf.reshape(positions, self.nn.input_t_shape)
+
         return [positions, states, actions]
 
     @abc.abstractmethod
