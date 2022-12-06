@@ -31,12 +31,6 @@ class Experiment:
                 "use_wandb": self.use_wandb,
         }
 
-    @property
-    def save_path(self):
-        if self.env is None:
-            raise ValueError("Environment not set")
-        return self.env.save_path_env
-
     def run_experiment(self,
                        max_episodes=1000,
                        max_steps_per_episode=2500,

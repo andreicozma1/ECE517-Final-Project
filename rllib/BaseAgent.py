@@ -22,7 +22,7 @@ class BaseAgent:
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     @property
-    def save_path(self):
+    def save_path_env(self):
         if self.env is None:
             raise ValueError("Environment not set")
         return self.env.save_path_env
