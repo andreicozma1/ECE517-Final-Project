@@ -7,9 +7,9 @@ import tensorflow as tf
 keras = tf.keras
 
 
-class A2C(keras.layers.Layer):
+class ActorCriticLayer(keras.layers.Layer):
     def __init__(self, num_actions, name="A2C", critic_activation="linear", **kwargs):
-        super(A2C, self).__init__(name=name, **kwargs)
+        super(ActorCriticLayer, self).__init__(name=name, **kwargs)
         self.num_actions = num_actions
         self.critic_activation = critic_activation
         self.actor = keras.layers.Dense(num_actions, name="actor")

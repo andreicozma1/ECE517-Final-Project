@@ -11,9 +11,8 @@ import tqdm
 import tensorflow as tf
 import wandb
 
-from BaseAgent import BaseAgent
-from Environments import PongEnvironment
-from BaseEnvironment import BaseEnvironment
+from rllib.BaseAgent import BaseAgent
+from rllib.BaseEnvironment import BaseEnvironment
 
 
 class Experiment:
@@ -37,29 +36,8 @@ class Experiment:
                        training=True,
                        use_wandb: bool = True):
 
-        hash_all = hashlib.md5(json.dumps(self.config).encode('utf-8')).hexdigest()
-        model_hash = self.config["agent"]["nn"]["config_hash"]
-        wandb.init(project="ECE517",
-                   entity="utkteam",
-                   mode="online" if use_wandb else "disabled",
-                   name=hash_all,
-                   group=self.config["agent"]["nn"]["name"],
-                   job_type="train" if training else "test",
-                   tags=[model_hash],
-                   config=self.config)
-        model_img_filename = f"{model_hash}.png"
-        tf.keras.utils.plot_model(self.agent.nn.model,
-                                  to_file=model_img_filename,
-                                  show_layer_names=True,
-                                  show_shapes=True,
-                                  show_dtype=True,
-                                  expand_nested=True,
-                                  show_layer_activations=True,
-                                  dpi=120)
-        wandb.log({
-                "model": wandb.Image(model_img_filename)
-        })
-        os.remove(model_img_filename)
+        model_hash = self._init_experiment(training, use_wandb)
+        self.plot_model(model_hash)
 
         stats = {}
         episodes_reward: collections.deque = collections.deque(maxlen=running_rew_len)
@@ -84,7 +62,6 @@ class Experiment:
             }
             tq.set_postfix(stats)
 
-            # if use_wandb:
             wandb.log(stats)
 
         return stats
@@ -116,3 +93,31 @@ class Experiment:
             # wandb.log(stats)
 
         return stats
+
+    def _init_experiment(self, training, use_wandb):
+        hash_all = hashlib.md5(json.dumps(self.config).encode('utf-8')).hexdigest()
+        model_hash = self.config["agent"]["nn"]["config_hash"]
+        wandb.init(project="ECE517",
+                   entity="utkteam",
+                   mode="online" if use_wandb else "disabled",
+                   name=hash_all,
+                   group=self.config["agent"]["nn"]["name"],
+                   job_type="train" if training else "test",
+                   tags=[model_hash],
+                   config=self.config)
+        return model_hash
+
+    def plot_model(self, model_hash):
+        model_img_filename = f"{model_hash}.png"
+        tf.keras.utils.plot_model(self.agent.nn.model,
+                                  to_file=model_img_filename,
+                                  show_layer_names=True,
+                                  show_shapes=True,
+                                  show_dtype=True,
+                                  expand_nested=True,
+                                  show_layer_activations=True,
+                                  dpi=120)
+        wandb.log({
+                "model": wandb.Image(model_img_filename)
+        })
+        os.remove(model_img_filename)

@@ -7,11 +7,12 @@ from typing import Tuple
 import numpy as np
 import pygame
 import tensorflow as tf
-from Environments import LunarLander, PongEnvironment
-from Experiment import Experiment
-from NeuralNet import NeuralNet
-from BaseAgent import BaseAgent
+
 # This is a hacky fix for tensorflow imports to work with intellisense
+from rllib.BaseAgent import BaseAgent
+from rllib.Environments import LunarLander
+from rllib.Experiment import Experiment
+from rllib.NeuralNet import NeuralNet
 from rllib.PlotHelper import PlotHelper
 from rllib.utils import logging_setup
 
@@ -216,7 +217,7 @@ def main():
 
     exp = Experiment(env, agent)
 
-    exp.run_experiment()
+    exp.run_experiment(use_wandb=False)
     exp.run_test()
 
 

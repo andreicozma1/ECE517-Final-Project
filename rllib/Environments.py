@@ -3,8 +3,8 @@ from typing import Any, Tuple
 import gymnasium
 import numpy as np
 
-from BaseEnvironment import BaseEnvironment
 from rlenv import pongGame
+from rllib.BaseEnvironment import BaseEnvironment
 
 
 class PongEnvironment(BaseEnvironment):

@@ -7,8 +7,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
 
-from CustomLayers import A2C, ActorLoss, StateAndPositionEmbedding, TransformerEncoder, \
-    TransformerEncoderBlock
+from rllib.CustomLayers import ActorCriticLayer, ActorLoss, StateAndPositionEmbedding, TransformerEncoder
 
 keras = tf.keras
 
@@ -60,7 +59,7 @@ class NeuralNet:
                                                                            input_actions,
                                                                            **kwargs)
 
-        ac_layer = A2C(self.num_actions, critic_activation=c_final_act)
+        ac_layer = ActorCriticLayer(self.num_actions, critic_activation=c_final_act)
         ac_outputs = ac_layer(actor_inputs=actor_inputs, critic_inputs=critic_inputs)
 
         model = keras.Model(inputs=[input_t, input_states, input_actions], outputs=ac_outputs, name=model_name)

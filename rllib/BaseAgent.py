@@ -4,15 +4,10 @@ import pprint
 from typing import Tuple
 
 import numpy as np
-import pygame
 import tensorflow as tf
-from matplotlib import pyplot as plt
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from tqdm import tqdm
 
-from Environments import PongEnvironment
-from BaseEnvironment import BaseEnvironment
-from NeuralNet import NeuralNet
+from rllib.BaseEnvironment import BaseEnvironment
+from rllib.NeuralNet import NeuralNet
 
 keras = tf.keras
 eps = np.finfo(np.float32).eps.item()
