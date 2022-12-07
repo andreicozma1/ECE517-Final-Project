@@ -41,6 +41,42 @@ class A2CAgent(BaseAgent):
         self.entropy_loss_multiplier = entropy_loss_multiplier
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
+    def get_inputs(self, curr_timestep, state_hist, actions_hist, rewards_hist):
+        print("=" * 80)
+        print("curr_timestep", curr_timestep)
+        states, actions, rewards = state_hist.stack(), actions_hist.stack(), rewards_hist.stack()
+        # print("s", states)
+        # print("a", actions)
+        # print("r", rewards)
+
+        pos_s = tf.range(start=curr_timestep - self.nn.max_timesteps + 1, limit=curr_timestep + 1, delta=1)
+        pos_s = tf.clip_by_value(pos_s, clip_value_min=-1, clip_value_max=curr_timestep)
+
+        states = tf.gather(states, pos_s, axis=0)
+
+        actions = tf.one_hot(actions, depth=self.nn.num_actions)
+        actions = tf.gather(actions, pos_s, axis=0)
+
+        positions = tf.reshape(pos_s, shape=self.nn.inp_p_shape)
+        states = tf.reshape(states, shape=self.nn.inp_s_shape)
+        actions = tf.reshape(actions, shape=self.nn.inp_a_shape)
+        print("positions", positions)
+        print("states", states)
+        print("actions", actions)
+        print("=" * 80)
+
+        return [positions, states, actions]
+
+    def get_action(self, model_outputs, deterministic):
+        action_logits_t, critic_value = model_outputs
+        action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
+        action = tf.random.categorical(action_logits_t, 1)[0, 0]
+        action_probs_t = tf.nn.softmax(action_logits_t)
+        if deterministic:
+            action = tf.argmax(action_probs_t, axis=1)[0]
+        action = tf.cast(action, tf.int32)
+        return action
+
     def compute_loss(self, hist_sar, hist_model_out: list):
         if self.nn.critic_loss is None:
             raise ValueError("Loss is None")
