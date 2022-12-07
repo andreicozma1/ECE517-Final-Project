@@ -352,11 +352,10 @@ class TransformerActorCritic(keras.layers.Layer):
         # print("emb_state", emb_state)
         # print("emb_actions", emb_actions)
 
-        x = tf.concat([emb_state, emb_actions], axis=-1)
-        layer_norm_out = self.norm_layer(x)
-        transformer_out = self.transformer_encoder(layer_norm_out, training=True, mask=mask_att)
-
-        output = self.pooling_layer(transformer_out)
+        output = tf.concat([emb_state, emb_actions], axis=-1)
+        output = self.norm_layer(output)
+        output = self.transformer_encoder(output, training=True, mask=mask_att)
+        output = self.pooling_layer(output)
         for layer in self.common_layers:
             output = layer(output)
         return output

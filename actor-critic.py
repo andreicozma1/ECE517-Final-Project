@@ -34,9 +34,9 @@ class A2CAgent(BaseAgent):
 
     def __init__(self, nn: Network,
                  gamma: float = 0.97,
-                 actor_loss_multiplier=0.25,
+                 entropy_loss_multiplier=0.1,
+                 actor_loss_multiplier=0.2,
                  critic_loss_multiplier=1.0,
-                 entropy_loss_multiplier=0.05,
                  ):
         super().__init__(nn=nn, gamma=gamma)
         self.actor_loss_multiplier = actor_loss_multiplier
@@ -92,14 +92,13 @@ class A2CAgent(BaseAgent):
         entropy_loss = self.get_entropy_loss(action_probs)
         entropy_loss = self.normalize(entropy_loss)
         entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
-
-        action_probs_max = tf.reduce_max(action_probs, axis=-1)
+        action_probs = tf.reduce_max(action_probs, axis=-1)
 
         actual_returns = self.expected_return(hist_rewards)
         actual_returns = self.normalize(actual_returns)
         critic_returns = self.normalize(critic_returns)
 
-        action_probs_max = tf.reshape(action_probs_max, shape=(-1, 1))
+        # action_probs_max = tf.reshape(action_probs_max, shape=(-1, 1))
         critic_returns = tf.reshape(critic_returns, shape=(-1, 1))
         actual_returns = tf.reshape(actual_returns, shape=(-1, 1))
 
@@ -107,11 +106,12 @@ class A2CAgent(BaseAgent):
 
         self.plot_ret(actual_returns, advantage, critic_returns)
 
-        actor_losses = self.actor_loss(action_probs_max, advantage)
+        actor_losses = self.actor_loss(action_probs, advantage)
         actor_losses = self.normalize(actor_losses)
         actor_losses = tf.math.multiply(actor_losses, self.actor_loss_multiplier)
 
         # entropy_loss = self.get_entropy_loss(action_probs_max)
+        # entropy_loss = self.standardize(entropy_loss)
         # entropy_loss = self.normalize(entropy_loss)
         # entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
 
@@ -119,7 +119,7 @@ class A2CAgent(BaseAgent):
         critic_losses = self.normalize(critic_losses)
         critic_losses = tf.math.multiply(critic_losses, self.critic_loss_multiplier)
 
-        total_losses = actor_losses + critic_losses + entropy_loss
+        total_losses = actor_losses + critic_losses
         # total_losses = self.normalize(total_losses)
         # total_losses = tf.clip_by_value(total_losses, clip_value_min=-1, clip_value_max=1)
 
@@ -229,7 +229,7 @@ def main():
 
     nn = Network("transformer",
                  env.num_states, env.num_actions,
-                 max_timesteps=15, learning_rate=0.00001)
+                 max_timesteps=15, learning_rate=0.0001)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent, use_wandb=False)
