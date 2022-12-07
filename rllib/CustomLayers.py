@@ -25,8 +25,10 @@ class ActorCriticLayer(keras.layers.Layer):
         })
         return config
 
-    def call(self, actor_inputs: tf.Tensor, critic_inputs: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        return self.actor(actor_inputs), self.critic(critic_inputs)
+    def call(self, common):
+        actor = self.actor(common)
+        critic = self.critic(common)
+        return actor, critic
 
 
 class ActorLoss(tf.keras.losses.Loss):
@@ -235,124 +237,118 @@ class StateAndPositionEmbedding(keras.layers.Layer):
         self.num_inputs = num_inputs
         self.num_timesteps = num_timesteps
         self.embed_dim = embed_dim
-        self.position_embedding = keras.layers.Embedding(input_dim=self.num_timesteps,
-                                                         output_dim=self.embed_dim)
+        self.emb_pos = keras.layers.Embedding(input_dim=self.num_timesteps,
+                                              output_dim=self.embed_dim,
+                                              name="pos_embedding")
         # self.state_embedding = keras.layers.Dense(self.embed_dim, activation="linear")
         # Create dense layers for each input
-        self.state_embedding = [keras.layers.Dense(self.embed_dim, activation="linear") for _ in range(self.num_inputs)]
+        self.emb_inputs = [keras.layers.Dense(self.embed_dim, activation="linear") for _ in range(self.num_inputs)]
 
     def get_config(self):
         config = super().get_config()
         config.update({
-                "num_timesteps"     : self.num_timesteps,
-                "embed_dim"         : self.embed_dim,
-                "position_embedding": self.position_embedding.get_config(),
-                "state_embedding"   : self.state_embedding
+                "num_inputs"   : self.num_inputs,
+                "num_timesteps": self.num_timesteps,
+                "embed_dim"    : self.embed_dim,
+                "emb_pos"      : self.emb_pos.get_config(),
+                "emb_inputs"   : self.emb_inputs
         })
         return config
 
     def call(self, pos_arr, inputs):
         # embed each timestep
-        pos_encoding = self.position_embedding(pos_arr)
+        pos_encoding = self.emb_pos(pos_arr)
+        # print("pos_encoding", pos_encoding)
         # embed each input
-        input_encoding = [self.state_embedding[i](inputs[i]) + pos_encoding for i in range(self.num_inputs)]
-        # sum the positional and input encoding
-        return tf.math.add_n(input_encoding)
+        encoding = []
+        for i in range(self.num_inputs):
+            emb_i = self.emb_inputs[i](inputs[i]) + pos_encoding
+            # print("emb_i", emb_i)
+            encoding.append(emb_i)
+        # print("encoding", encoding)
+        # add the two embeddings
+        return encoding
 
 
-class TransformerActorCritic(keras.Model):
-    def __init__(self, seq_len, num_features, num_actions,
-                 critic_final_activation="linear",
-                 name="transformer_actor_critic", **kwargs):
+# class CustomInputs(keras.layers.Input):
+#     def __init__(self, seq_len, num_features, num_actions):
+#         super(CustomInputs, self).__init__()
+#         self.seq_len = seq_len
+#         self.num_features = num_features
+#         self.num_actions = num_actions
+#         self.inp_pos_shape = (1, self.seq_len)
+#         self.inp_state_shape = (1, self.seq_len, self.num_features)
+#         self.inp_actions_shape = (1, self.seq_len, self.num_actions)
+#         # self.inp_pos_layer = keras.layers.Input(batch_input_shape=self.inp_pos_shape, name="inp_pos_layer")
+#         # self.inp_states_layer = keras.layers.Input(batch_input_shape=self.inp_state_shape, name="inp_states_layer")
+#         # self.inp_actions_layer = keras.layers.Input(batch_input_shape=self.inp_actions_shape, name="inp_actions_layer")
+#
+#     def get_config(self):
+#         config = super().get_config()
+#         config.update({
+#                 "seq_len"          : self.seq_len,
+#                 "num_features"     : self.num_features,
+#                 "num_actions"      : self.num_actions,
+#                 "inp_pos_shape"    : self.inp_pos_shape,
+#                 "inp_state_shape"  : self.inp_state_shape,
+#                 "inp_actions_shape": self.inp_actions_shape,
+#                 "inp_pos_layer"    : self.inp_pos_layer.get_config(),
+#                 "inp_states_layer" : self.inp_states_layer.get_config(),
+#                 "inp_actions_layer": self.inp_actions_layer.get_config()
+#         })
+#         return config
+
+
+class TransformerActorCritic(keras.layers.Layer):
+    def __init__(self, seq_len, name="transformer_actor_critic", **kwargs):
         super().__init__(name=name, **kwargs)
         self.seq_len = seq_len
-        self.num_features = num_features
-        self.num_actions = num_actions
-        self.critic_final_activation = critic_final_activation
 
-        self.inp_pos_shape = (1, self.seq_len)
-        self.inp_state_shape = (1, self.seq_len, self.num_features)
-        self.inp_actions_shape = (1, self.seq_len, self.num_actions)
+        emb_dim = 64
+        t_layers = 2
+        t_num_heads = 10
+        t_dropout = 0.1
+        t_ff_dim = [256, 256, 256]
 
-        self.inp_pos_layer = keras.layers.Input(batch_input_shape=self.inp_pos_shape, name="input_t")
-        self.inp_states_layer = keras.layers.Input(batch_input_shape=self.inp_state_shape, name="input_states")
-        self.inp_actions_layer = keras.layers.Input(batch_input_shape=self.inp_actions_shape, name="input_actions")
+        self.embedding_layer = StateAndPositionEmbedding(2, self.seq_len, emb_dim)
+        self.masking_layer = keras.layers.Masking(mask_value=0.0)
+        self.norm_layer = keras.layers.LayerNormalization(epsilon=1e-6)
 
-        self.actor_critic_layer = ActorCriticLayer(self.num_actions, critic_activation=self.critic_final_activation)
+        self.transformer_encoder = TransformerEncoders(num_layers=t_layers,
+                                                       embed_dim=emb_dim * 2,
+                                                       num_heads=t_num_heads,
+                                                       ff_dim=t_ff_dim,
+                                                       dropout=t_dropout)
 
-        self.state_embedding_layer = StateAndPositionEmbedding(self.num_features, self.seq_len, 64)
-        self.transformer_encoder = TransformerEncoders(num_layers=2, embed_dim=64, num_heads=4, ff_dim=128)
-        self.transformer_decoder = TransformerDecoders(num_layers=2, embed_dim=64, num_heads=4, ff_dim=128)
-        self.dense = keras.layers.Dense(self.num_actions)
+        self.pooling_layer = keras.layers.GlobalAveragePooling1D()
+        self.common_layers = [keras.layers.Dense(256, activation="relu") for _ in range(5)]
 
     def get_config(self):
         config = super().get_config()
         config.update({
-                "seq_len"                : self.seq_len,
-                "num_features"           : self.num_features,
-                "num_actions"            : self.num_actions,
-                "critic_final_activation": self.critic_final_activation,
-                "input_positions_shape"  : self.inp_pos_shape,
-                "input_state_shape"      : self.inp_state_shape,
-                "input_actions_shape"    : self.inp_actions_shape,
-                "ac_layer"               : self.actor_critic_layer.get_config(),
-                "state_embedding"        : self.state_embedding_layer.get_config(),
-                "transformer_encoder"    : self.transformer_encoder.get_config(),
-                "transformer_decoder"    : self.transformer_decoder.get_config(),
-                "dense"                  : self.dense.get_config(),
+                "seq_len": self.seq_len
         })
         return config
 
-    def action_value(self, states):
-        # states is a tensor of shape [batch_size, sequence_length, num_features]
-        # returns a tensor of shape [batch_size, sequence_length, num_actions]
-        sequence_length = tf.shape(states)[1]
-        positions = tf.range(start=0, limit=sequence_length, delta=1)
-        positions = tf.expand_dims(positions, axis=0)
-        actions = tf.zeros(shape=(1, sequence_length, self.num_actions))
-        return self((positions, states, actions))
+    def call(self, inputs):
+        inp_p, inp_s, inp_a = inputs[0], inputs[1], inputs[2]
+        # print("inp_pos_layer", inp_pos_layer)
+        # print("inp_states_layer", inp_states_layer)
+        # print("inp_actions_layer", inp_actions_layer)
+        mask_att = self.masking_layer.compute_mask(inp_a)
+        mask_att = tf.cast(mask_att, tf.bool)
 
-    def train_step(self, data):
-        # Unpack the data. Its structure depends on your model and
-        # on what you pass to `fit()`.
-        x, y, sample_weight = data
+        print("mask_att", mask_att)
+        # print("attention_mask", attention_mask)
+        emb_state, emb_actions = self.embedding_layer(inp_p, [inp_s, inp_a])
+        # print("emb_state", emb_state)
+        # print("emb_actions", emb_actions)
 
-        with tf.GradientTape() as tape:
-            logits, value = self(x, training=True)
-            # Compute the loss value
-            # (the loss function is configured in `compile()`)
-            loss = self.compiled_loss(y, logits, sample_weight, regularization_losses=self.losses)
+        x = tf.concat([emb_state, emb_actions], axis=-1)
+        layer_norm_out = self.norm_layer(x)
+        transformer_out = self.transformer_encoder(layer_norm_out, training=True, mask=mask_att)
 
-        # Compute gradients
-        trainable_vars = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_vars)
-        # Update weights
-        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-        # Update metrics (includes the metric that tracks the loss)
-        self.compiled_metrics.update_state(y, logits, sample_weight)
-        # Return a dict mapping metric names to current value
-        return {m.name: m.result() for m in self.metrics}
-
-    def test_step(self, data):
-        # Unpack the data
-        x, y, sample_weight = data
-        # Compute predictions
-        y_pred = self(x, training=False)
-        # Updates the metrics tracking the loss
-        self.compiled_loss(y, y_pred, sample_weight, regularization_losses=self.losses)
-        # Update the metrics.
-        self.compiled_metrics.update_state(y, y_pred, sample_weight)
-        # Return a dict mapping metric names to current value
-        return {m.name: m.result() for m in self.metrics}
-
-    def call(self, inputs, training=False):
-        # inputs is a tuple of (positions, states, actions)
-        positions, states, actions = inputs
-        # embed the states and positions
-        x = self.state_embedding_layer(positions, states)
-        # encode the states
-        x = self.transformer_encoder(x)
-        # decode the actions
-        x = self.transformer_decoder(x, actions)
-        # predict the logits and value
-        return self.actor_critic_layer(x)
+        output = self.pooling_layer(transformer_out)
+        for layer in self.common_layers:
+            output = layer(output)
+        return output

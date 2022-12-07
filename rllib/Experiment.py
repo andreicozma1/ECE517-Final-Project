@@ -44,9 +44,10 @@ class Experiment:
         ronning_loss: collections.deque = collections.deque(maxlen=running_rew_len)
 
         tq = tqdm.trange(max_episodes, desc="Train", leave=True)
-        for ep in tq:
-            rewards, loss = self.agent.train_step(self.env, max_steps_per_episode)
-            rewards, loss = rewards.numpy(), loss.numpy()
+        for _ in tq:
+            hist_sar, _, loss = self.agent.train_step(self.env, max_steps_per_episode)
+            _, _, hist_rewards = hist_sar
+            rewards, loss = hist_rewards.numpy(), loss.numpy()
             total_steps, total_reward, total_loss = len(rewards), np.sum(rewards), np.sum(loss)
             running_reward.append(total_reward)
             ronning_loss.append(total_loss)

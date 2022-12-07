@@ -1,7 +1,7 @@
 import abc
 import logging
 import pprint
-from typing import Tuple
+from typing import List, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -54,115 +54,109 @@ class BaseAgent:
         returns = returns.stack()[::-1]
         return returns
 
-    def run_episode(self, env: BaseEnvironment, max_steps: int, deterministic: bool = False) -> Tuple[tf.Tensor,
-                                                                                                      Tuple[tf.Tensor,
-                                                                                                            tf.Tensor]]:
+    def run_episode(self, env: BaseEnvironment,
+                    max_steps: int,
+                    deterministic: bool = False) -> Tuple[Tuple[tf.Tensor, tf.Tensor, tf.Tensor], list]:
+
         self.env: BaseEnvironment = env
-
-        action_probs_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-        critic_returns_hist = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
-
-        state_hist = tf.TensorArray(dtype=tf.float32, size=self.nn.max_timesteps,
-                                    dynamic_size=True,
-                                    element_shape=(self.nn.num_features,))
-        actions_hist = tf.TensorArray(dtype=tf.float32, size=self.nn.max_timesteps,
-                                      dynamic_size=True,
-                                      element_shape=(self.nn.num_actions,))
-
-        rewards = tf.TensorArray(dtype=tf.float32, size=0, dynamic_size=True)
 
         initial_state = env.tf_reset()
         initial_state_shape = initial_state.shape
+
+        hist_s = tf.TensorArray(dtype=tf.float32, size=0,
+                                dynamic_size=True,
+                                element_shape=initial_state_shape)
+        hist_a = tf.TensorArray(dtype=tf.int32, size=0,
+                                dynamic_size=True,
+                                element_shape=())
+        hist_r = tf.TensorArray(dtype=tf.float32, size=0,
+                                dynamic_size=True,
+                                element_shape=())
+
+        hist_model_o = []
+
         current_state = initial_state
-
         # tq = tqdm(tf.range(max_steps), desc=f"Ep. {self.global_episode:>6}", leave=False)
-        for timestep in tf.range(max_steps):
+        for curr_timestep in tf.range(max_steps):
+            hist_s = hist_s.write(curr_timestep, current_state)
 
-            state_hist = state_hist.write(self.nn.max_timesteps + timestep, tf.squeeze(current_state))
+            model_inputs = self.get_inputs(curr_timestep, hist_s, hist_a, hist_r)
+            model_outputs = self.nn.model(model_inputs)
+            # print("model_outputs", model_outputs)
+            hist_model_o.append(model_outputs)
 
-            # action = self.get_action(step, state, deterministic)
-            model_inputs = self.get_model_inputs(timestep, state_hist, actions_hist)
+            action: tf.Tensor = self.get_action(model_outputs, deterministic)
+            hist_a = hist_a.write(curr_timestep, action)
 
-            # print("=" * 80)
-            # print(current_state)
-            # print(current_action_hist)
-            # print(last_t_states)
+            tf_step: List[tf.Tensor] = env.tf_step(action)
+            current_state, reward, done = tf_step
 
-            # logging.info(f"state: {state} \t shape: {state.shape}")
-            action_logits_t, critic_value = self.nn.model(model_inputs)
-            # logging.debug(f"action_logits_t: {action_logits_t} | critic_value: {critic_value}")
-
-            action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
-            critic_value = tf.squeeze(critic_value)
-
-            # action = tfp.distributions.Categorical(logits=action_logits_t[0]).sample()
-            action = tf.random.categorical(action_logits_t, 1)[0, 0]
-            action_probs_t = tf.nn.softmax(action_logits_t)
-            if deterministic:
-                action = tf.argmax(action_probs_t, axis=1)[0]
-
-            # logging.debug(f"action: {action} | action_probs_t: {action_probs_t}")
-
-            critic_returns_hist = critic_returns_hist.write(timestep, critic_value)
-            action_probs_hist = action_probs_hist.write(timestep, action_probs_t[0, action])
-            actions_hist = actions_hist.write(self.nn.max_timesteps + timestep, tf.one_hot(action, self.nn.num_actions))
-
-            current_state, reward, done = env.tf_step(action)
+            hist_r = hist_r.write(curr_timestep, reward)
             current_state.set_shape(initial_state_shape)
-
-            rewards = rewards.write(timestep, reward)
+            # hist_s = hist_s.write(curr_timestep + 1, current_state)
             if tf.cast(done, tf.bool):
                 break
 
-        state_hist.mark_used()
-        actions_hist.mark_used()
-        rewards = rewards.stack()
-        action_probs_hist = action_probs_hist.stack()
-        critic_returns_hist = critic_returns_hist.stack()
-        # histories = self.on_episode_end(histories)
+        hist_s = hist_s.stack()
+        hist_a = hist_a.stack()
+        hist_r = hist_r.stack()
 
-        return rewards, (action_probs_hist, critic_returns_hist)
+        hist_model_o = zip(*hist_model_o)
 
-    def get_model_inputs(self, curr_timestep, state_hist, actions_hist):
-        positions = tf.range(start=curr_timestep - self.nn.max_timesteps + 1, limit=curr_timestep + 1, delta=1)
-        positions = tf.clip_by_value(positions, 0, curr_timestep)
-        positions = tf.reshape(positions, self.nn.input_t_shape)
+        return (hist_s, hist_a, hist_r), hist_model_o
 
-        states = state_hist.stack()
-        states = states[-self.nn.max_timesteps:, :]
-        states = tf.reshape(states, self.nn.input_state_shape)
+    def get_inputs(self, curr_timestep, state_hist, actions_hist, rewards_hist):
+        print("=" * 80)
+        print("curr_timestep", curr_timestep)
+        states, actions, rewards = state_hist.stack(), actions_hist.stack(), rewards_hist.stack()
+        # print("s", states)
+        # print("a", actions)
+        # print("r", rewards)
 
-        actions = actions_hist.stack()
-        actions = actions[-self.nn.max_timesteps:, :]
-        actions = tf.reshape(actions, self.nn.input_actions_shape)
+        pos_s = tf.range(start=curr_timestep - self.nn.max_timesteps + 1, limit=curr_timestep + 1, delta=1)
+        pos_s = tf.clip_by_value(pos_s, clip_value_min=-1, clip_value_max=curr_timestep)
+
+        states = tf.gather(states, pos_s, axis=0)
+
+        actions = tf.one_hot(actions, depth=self.nn.num_actions)
+        actions = tf.gather(actions, pos_s, axis=0)
+
+        positions = tf.reshape(pos_s, shape=self.nn.inp_p_shape)
+        states = tf.reshape(states, shape=self.nn.inp_s_shape)
+        actions = tf.reshape(actions, shape=self.nn.inp_a_shape)
+        print("positions", positions)
+        print("states", states)
+        print("actions", actions)
+        print("=" * 80)
 
         return [positions, states, actions]
 
-    @abc.abstractmethod
-    def on_episode_start(self):
-        pass
-
-    @abc.abstractmethod
-    def get_action(self, t, state, deterministic):
-        pass
+    def get_action(self, model_outputs, deterministic):
+        action_logits_t, critic_value = model_outputs
+        action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
+        action = tf.random.categorical(action_logits_t, 1)[0, 0]
+        action_probs_t = tf.nn.softmax(action_logits_t)
+        if deterministic:
+            action = tf.argmax(action_probs_t, axis=1)[0]
+        action = tf.cast(action, tf.int32)
+        return action
 
     # @tf.function
-    def train_step(self, env: BaseEnvironment, max_steps_per_episode: int) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    def train_step(self, env: BaseEnvironment,
+                   max_steps_per_episode: int) -> Tuple[Tuple[tf.Tensor, tf.Tensor, tf.Tensor], tf.Tensor, tf.Tensor]:
         self.env: BaseEnvironment = env
         with tf.GradientTape() as tape:
-            rewards, extras = self.run_episode(env, max_steps_per_episode)
+            hist_sar, hist_out = self.run_episode(env, max_steps_per_episode)
+            loss = self.compute_loss(hist_sar, hist_out)
 
-            compute_error_vals = self.compute_error(rewards, extras)
+        grads = tape.gradient(loss, self.nn.model.trainable_variables)
+        # Apply the gradients to the model's parameters
+        self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
 
-        self.on_update(compute_error_vals, tape)
-        return rewards, compute_error_vals
-
-    @abc.abstractmethod
-    def compute_error(self, rewards, extras):
-        pass
+        return hist_sar, hist_out, loss
 
     @abc.abstractmethod
-    def on_update(self, compute_error_vals, tape):
+    def compute_loss(self, rewards, extras):
         pass
 
     def normalize(self, values: tf.Tensor) -> tf.Tensor:

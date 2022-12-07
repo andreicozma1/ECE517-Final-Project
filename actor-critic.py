@@ -41,38 +41,36 @@ class A2CAgent(BaseAgent):
         self.entropy_loss_multiplier = entropy_loss_multiplier
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
-    def compute_error(self, rewards, extras):
-        action_probs, critic_returns = extras
-        actual_returns = self.expected_return(rewards)
+    def compute_loss(self, hist_sar, hist_model_out: list):
+        if self.nn.critic_loss is None:
+            raise ValueError("Loss is None")
+
+        hist_states, hist_actions, hist_rewards = hist_sar
+        action_probs, critic_returns = hist_model_out
+        action_probs = tf.stack(action_probs, axis=1)
+        critic_returns = tf.stack(critic_returns, axis=1)
+        # transform the actor logits to action probabilities
+        action_probs = tf.nn.softmax(action_probs, axis=-1)
+
+        actual_returns = self.expected_return(hist_rewards)
 
         actual_returns = self.standardize(actual_returns)
         critic_returns = self.standardize(critic_returns)
 
-        action_probs = tf.reshape(action_probs, shape=(-1, 1))
+        # action_probs = tf.reshape(action_probs, shape=(-1, 1))
+        action_probs = tf.squeeze(action_probs)
         critic_returns = tf.reshape(critic_returns, shape=(-1, 1))
         actual_returns = tf.reshape(actual_returns, shape=(-1, 1))
 
-        loss, advantage = self.compute_loss(action_probs, critic_returns, actual_returns)
+        advantage = actual_returns - critic_returns
+
+        print(action_probs.shape)
+        print(critic_returns.shape)
+        print(actual_returns.shape)
+
+        print(advantage.shape)
 
         self.plot_ret(actual_returns, advantage, critic_returns)
-
-        return loss
-
-    def get_entropy_loss(self, action_probs: tf.Tensor) -> tf.Tensor:
-        entropy_loss = tf.math.multiply(action_probs, tf.math.log(action_probs))
-        entropy_loss = -1 * tf.reduce_sum(entropy_loss, axis=-1)
-        return entropy_loss
-
-    def compute_loss(self,
-                     action_probs: tf.Tensor,
-                     critic_returns: tf.Tensor,
-                     actual_returns: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        """Computes the combined Actor-Critic loss."""
-        if self.nn.critic_loss is None:
-            raise ValueError("Loss is None")
-        # If action is better than average, the advantage function is positive,
-        # if worse, it is negative.
-        advantage = actual_returns - critic_returns
 
         actor_losses = self.nn.actor_loss(action_probs, advantage)
         actor_losses = self.normalize(actor_losses)
@@ -88,17 +86,14 @@ class A2CAgent(BaseAgent):
 
         total_losses = tf.math.add(actor_losses, critic_losses, entropy_loss)
 
-        loss = tf.reduce_sum(total_losses)
-
         self.plot_loss(actor_losses, critic_losses, total_losses, entropy_loss=entropy_loss)
 
-        return loss, advantage
+        return tf.reduce_sum(total_losses)
 
-    def on_update(self, loss, tape):
-        # Compute the gradients from the loss
-        grads = tape.gradient(loss, self.nn.model.trainable_variables)
-        # Apply the gradients to the model's parameters
-        self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
+    def get_entropy_loss(self, action_probs: tf.Tensor) -> tf.Tensor:
+        entropy_loss = tf.math.multiply(action_probs, tf.math.log(action_probs))
+        entropy_loss = -1 * tf.reduce_sum(entropy_loss, axis=-1)
+        return entropy_loss
 
     def plot_ret(self, actual_returns, advantage, critic_returns):
         plot_returns = {
@@ -143,7 +138,7 @@ class A2CAgent(BaseAgent):
                         }
                 ],
                 "suptitle"    : f"A2C Returns ({self.env.name}): "
-                                f"{self.nn.name} - {self.nn.input_state_shape}" +
+                                f"{self.nn.name} - {self.nn.inp_s_shape}" +
                                 f" + ({self.env.state_scaler.__class__.__name__})"
                 if self.env.state_scaler_enable is True else "",
         }
@@ -197,13 +192,12 @@ def main():
 
     nn = Network("transformer",
                  env.num_states, env.num_actions,
-                 max_timesteps=25, learning_rate=0.000001)
+                 max_timesteps=5, learning_rate=0.000001)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent, use_wandb=False)
 
     exp.run_experiment()
-    exp.run_test()
 
 
 if __name__ == "__main__":
