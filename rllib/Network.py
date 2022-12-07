@@ -27,18 +27,7 @@ class Network:
         self.max_timesteps: int = max_timesteps
         self.kwargs = kwargs
 
-        ###################################################################
-        # OPTIMIZER
-        # optimizer = keras.optimizers.Adam(learning_rate=self.learning_rate)
-        # optimizer = keras.optimizers.Nadam(learning_rate=self.learning_rate)
-        # optimizer = tfa.optimizers.AdamW(
-        #         learning_rate=self.learning_rate, weight_decay=0.000005, amsgrad=True
-        # )
         self.optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
-
-        ###################################################################
-        # LOSS
-        # critic_loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
         self.critic_loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
         self.actor_loss = ActorLoss(reduction=tf.keras.losses.Reduction.NONE)
 
@@ -78,7 +67,3 @@ class Network:
                 "critic_loss": self.critic_loss.__class__.__name__,
                 "actor_loss" : self.actor_loss.__class__.__name__,
         }
-
-
-if __name__ == "__main__":
-    main()
