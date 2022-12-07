@@ -1,7 +1,8 @@
 import logging
 import pprint
-from typing import Tuple
+from typing import Tuple, Union
 
+import keras_nlp
 import tensorflow as tf
 
 keras = tf.keras
@@ -12,6 +13,8 @@ class ActorCriticLayer(keras.layers.Layer):
         super(ActorCriticLayer, self).__init__(name=name, **kwargs)
         self.num_actions = num_actions
         self.critic_activation = critic_activation
+        self.actor_dense = [keras.layers.Dense(64, activation="elu") for _ in range(4)]
+        self.crictic_dense = [keras.layers.Dense(64, activation="elu") for _ in range(4)]
         self.actor = keras.layers.Dense(num_actions, name="actor")
         self.critic = keras.layers.Dense(1, activation=critic_activation, name="critic")
 
@@ -26,8 +29,15 @@ class ActorCriticLayer(keras.layers.Layer):
         return config
 
     def call(self, common):
-        actor = self.actor(common)
-        critic = self.critic(common)
+        actor_inputs = common
+        for layer in self.actor_dense:
+            actor_inputs = layer(actor_inputs)
+        actor = self.actor(actor_inputs)
+
+        critic_inputs = common
+        for layer in self.crictic_dense:
+            critic_inputs = layer(critic_inputs)
+        critic = self.critic(critic_inputs)
         return actor, critic
 
 
@@ -228,26 +238,23 @@ class TransformerDecoders(keras.layers.Layer):
 
 class StateAndPositionEmbedding(keras.layers.Layer):
 
-    def __init__(self, num_inputs, num_timesteps, embed_dim):
-        super(StateAndPositionEmbedding, self).__init__()
+    def __init__(self, num_timesteps: int, embed_dim: Union[int, list], **kwargs):
+        super(StateAndPositionEmbedding, self).__init__(name="StateAndPositionEmbedding", **kwargs)
         """
         Returns positional encoding for a given sequence length and embedding dimension,
         as well as the padding mask for 0 values.
         """
-        self.num_inputs = num_inputs
         self.num_timesteps = num_timesteps
-        self.embed_dim = embed_dim
-        self.emb_pos = keras.layers.Embedding(input_dim=self.num_timesteps,
-                                              output_dim=self.embed_dim,
-                                              name="pos_embedding")
-        # self.state_embedding = keras.layers.Dense(self.embed_dim, activation="linear")
-        # Create dense layers for each input
-        self.emb_inputs = [keras.layers.Dense(self.embed_dim, activation="linear") for _ in range(self.num_inputs)]
+        self.embed_dim = [embed_dim] if isinstance(embed_dim, int) else embed_dim
+
+        self.emb_pos = [keras_nlp.layers.PositionEmbedding(sequence_length=self.num_timesteps) for edim in
+                        self.embed_dim]
+
+        self.emb_inputs = [keras.layers.Dense(edim, activation="linear") for edim in self.embed_dim]
 
     def get_config(self):
         config = super().get_config()
         config.update({
-                "num_inputs"   : self.num_inputs,
                 "num_timesteps": self.num_timesteps,
                 "embed_dim"    : self.embed_dim,
                 "emb_pos"      : self.emb_pos.get_config(),
@@ -257,14 +264,15 @@ class StateAndPositionEmbedding(keras.layers.Layer):
 
     def call(self, pos_arr, inputs):
         # embed each timestep
-        pos_encoding = self.emb_pos(pos_arr)
         # print("pos_encoding", pos_encoding)
         # embed each input
+
         encoding = []
-        for i in range(self.num_inputs):
-            emb_i = self.emb_inputs[i](inputs[i]) + pos_encoding
-            # print("emb_i", emb_i)
-            encoding.append(emb_i)
+        for i in range(len(self.embed_dim)):
+            emb_i = self.emb_inputs[i](inputs[i])
+            pos_i = self.emb_pos[i](emb_i)
+            added = keras.layers.Add()([emb_i, pos_i])
+            encoding.append(added)
         # print("encoding", encoding)
         # add the two embeddings
         return encoding
@@ -304,24 +312,24 @@ class TransformerActorCritic(keras.layers.Layer):
         super().__init__(name=name, **kwargs)
         self.seq_len = seq_len
 
-        emb_dim = 64
-        t_layers = 2
-        t_num_heads = 10
+        emb_dim = [32, 32]
+        t_layers = 1
+        t_num_heads = 5
         t_dropout = 0.1
-        t_ff_dim = [256, 256, 256]
+        t_ff_dim = [256, 512, 256]
 
-        self.embedding_layer = StateAndPositionEmbedding(2, self.seq_len, emb_dim)
+        self.embedding_layer = StateAndPositionEmbedding(self.seq_len, emb_dim)
         self.masking_layer = keras.layers.Masking(mask_value=0.0)
         self.norm_layer = keras.layers.LayerNormalization(epsilon=1e-6)
 
         self.transformer_encoder = TransformerEncoders(num_layers=t_layers,
-                                                       embed_dim=emb_dim * 2,
+                                                       embed_dim=sum(emb_dim),
                                                        num_heads=t_num_heads,
                                                        ff_dim=t_ff_dim,
                                                        dropout=t_dropout)
 
         self.pooling_layer = keras.layers.GlobalAveragePooling1D()
-        self.common_layers = [keras.layers.Dense(256, activation="relu") for _ in range(5)]
+        self.common_layers = [keras.layers.Dense(64, activation="elu") for _ in range(2)]
 
     def get_config(self):
         config = super().get_config()
@@ -335,10 +343,10 @@ class TransformerActorCritic(keras.layers.Layer):
         # print("inp_pos_layer", inp_pos_layer)
         # print("inp_states_layer", inp_states_layer)
         # print("inp_actions_layer", inp_actions_layer)
-        mask_att = self.masking_layer.compute_mask(inp_a)
+        mask_att = self.masking_layer.compute_mask(inp_s)
         mask_att = tf.cast(mask_att, tf.bool)
 
-        print("mask_att", mask_att)
+        # print("mask_att", mask_att)
         # print("attention_mask", attention_mask)
         emb_state, emb_actions = self.embedding_layer(inp_p, [inp_s, inp_a])
         # print("emb_state", emb_state)
