@@ -8,6 +8,7 @@ import tensorflow as tf
 
 # This is a hacky fix for tensorflow imports to work with intellisense
 from rllib.BaseAgent import BaseAgent
+from rllib.CustomLayers import ActorLoss
 from rllib.Environments import LunarLander
 from rllib.Experiment import Experiment
 from rllib.Network import Network
@@ -26,6 +27,8 @@ tf.random.set_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
+keras = tf.keras
+
 
 class A2CAgent(BaseAgent):
 
@@ -39,6 +42,8 @@ class A2CAgent(BaseAgent):
         self.actor_loss_multiplier = actor_loss_multiplier
         self.critic_loss_multiplier = critic_loss_multiplier
         self.entropy_loss_multiplier = entropy_loss_multiplier
+        self.critic_loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
+        self.actor_loss = ActorLoss(reduction=tf.keras.losses.Reduction.NONE)
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def get_inputs(self, curr_timestep, state_hist, actions_hist, rewards_hist):
@@ -78,9 +83,6 @@ class A2CAgent(BaseAgent):
         return action
 
     def compute_loss(self, hist_sar, hist_model_out: list):
-        if self.nn.critic_loss is None:
-            raise ValueError("Loss is None")
-
         hist_states, hist_actions, hist_rewards = hist_sar
         action_probs, critic_returns = hist_model_out
         action_probs = tf.stack(action_probs, axis=1)
@@ -108,7 +110,7 @@ class A2CAgent(BaseAgent):
 
         self.plot_ret(actual_returns, advantage, critic_returns)
 
-        actor_losses = self.nn.actor_loss(action_probs, advantage)
+        actor_losses = self.actor_loss(action_probs, advantage)
         actor_losses = self.normalize(actor_losses)
         actor_losses = tf.math.multiply(actor_losses, self.actor_loss_multiplier)
 
@@ -116,7 +118,7 @@ class A2CAgent(BaseAgent):
         entropy_loss = self.normalize(entropy_loss)
         entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
 
-        critic_losses = self.nn.critic_loss(critic_returns, actual_returns)
+        critic_losses = self.critic_loss(critic_returns, actual_returns)
         critic_losses = self.normalize(critic_losses)
         critic_losses = tf.math.multiply(critic_losses, self.critic_loss_multiplier)
 

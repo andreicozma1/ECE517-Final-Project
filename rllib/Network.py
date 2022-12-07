@@ -28,8 +28,6 @@ class Network:
         self.kwargs = kwargs
 
         self.optimizer = keras.optimizers.RMSprop(learning_rate=self.learning_rate)
-        self.critic_loss = keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
-        self.actor_loss = ActorLoss(reduction=tf.keras.losses.Reduction.NONE)
 
         self.inp_p_shape = (1, self.max_timesteps)
         self.inp_s_shape = (1, self.max_timesteps, self.num_features)
