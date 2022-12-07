@@ -210,7 +210,7 @@ class A2CAgent(BaseAgent):
                         }
                 ],
                 "title"  : f"A2C Losses ({self.env.name}): {self.nn.name} + "
-                           f"{self.nn.critic_loss.__class__.__name__} + "
+                           f"{self.critic_loss.__class__.__name__} + "
                            f"{self.nn.optimizer.__class__.__name__} - "
                            f"LR: {self.nn.learning_rate}",
         }

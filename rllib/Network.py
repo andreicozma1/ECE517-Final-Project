@@ -62,6 +62,4 @@ class Network:
                 "num_params" : self.model.count_params(),
                 "config"     : self.model_config,
                 "config_hash": self.model_config_hash,
-                "critic_loss": self.critic_loss.__class__.__name__,
-                "actor_loss" : self.actor_loss.__class__.__name__,
         }
