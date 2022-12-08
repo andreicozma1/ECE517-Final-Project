@@ -8,6 +8,7 @@ import tensorflow as tf
 
 # This is a hacky fix for tensorflow imports to work with intellisense
 from rllib.BaseAgent import BaseAgent
+from rllib.CustomLayers import ActorLoss
 from rllib.Environments import LunarLander
 from rllib.Experiment import Experiment
 from rllib.Network import Network
@@ -26,24 +27,28 @@ tf.random.set_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
 
+keras = tf.keras
+
 
 class A2CAgent(BaseAgent):
 
     def __init__(self, nn: Network,
                  gamma: float = 0.97,
-                 actor_loss_multiplier: float = 0.5,
-                 critic_loss_multiplier: float = 1.0,
-                 entropy_loss_multiplier: float = 0.01,
+                 entropy_loss_multiplier=0.1,
+                 actor_loss_multiplier=0.2,
+                 critic_loss_multiplier=1.0,
                  ):
         super().__init__(nn=nn, gamma=gamma)
         self.actor_loss_multiplier = actor_loss_multiplier
         self.critic_loss_multiplier = critic_loss_multiplier
         self.entropy_loss_multiplier = entropy_loss_multiplier
+        self.critic_loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
+        self.actor_loss = ActorLoss(reduction=tf.keras.losses.Reduction.NONE)
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def get_inputs(self, curr_timestep, state_hist, actions_hist, rewards_hist):
-        print("=" * 80)
-        print("curr_timestep", curr_timestep)
+        # print("=" * 80)
+        # print("curr_timestep", curr_timestep)
         states, actions, rewards = state_hist.stack(), actions_hist.stack(), rewards_hist.stack()
         # print("s", states)
         # print("a", actions)
@@ -60,10 +65,10 @@ class A2CAgent(BaseAgent):
         positions = tf.reshape(pos_s, shape=self.nn.inp_p_shape)
         states = tf.reshape(states, shape=self.nn.inp_s_shape)
         actions = tf.reshape(actions, shape=self.nn.inp_a_shape)
-        print("positions", positions)
-        print("states", states)
-        print("actions", actions)
-        print("=" * 80)
+        # print("positions", positions)
+        # print("states", states)
+        # print("actions", actions)
+        # print("=" * 80)
 
         return [positions, states, actions]
 
@@ -78,49 +83,45 @@ class A2CAgent(BaseAgent):
         return action
 
     def compute_loss(self, hist_sar, hist_model_out: list):
-        if self.nn.critic_loss is None:
-            raise ValueError("Loss is None")
-
         hist_states, hist_actions, hist_rewards = hist_sar
         action_probs, critic_returns = hist_model_out
         action_probs = tf.stack(action_probs, axis=1)
         critic_returns = tf.stack(critic_returns, axis=1)
-        # transform the actor logits to action probabilities
+
         action_probs = tf.nn.softmax(action_probs, axis=-1)
+        entropy_loss = self.get_entropy_loss(action_probs)
+        entropy_loss = self.normalize(entropy_loss)
+        entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
+        action_probs = tf.reduce_max(action_probs, axis=-1)
 
         actual_returns = self.expected_return(hist_rewards)
+        actual_returns = self.normalize(actual_returns)
+        critic_returns = self.normalize(critic_returns)
 
-        actual_returns = self.standardize(actual_returns)
-        critic_returns = self.standardize(critic_returns)
-
-        # action_probs = tf.reshape(action_probs, shape=(-1, 1))
-        action_probs = tf.squeeze(action_probs)
+        # action_probs_max = tf.reshape(action_probs_max, shape=(-1, 1))
         critic_returns = tf.reshape(critic_returns, shape=(-1, 1))
         actual_returns = tf.reshape(actual_returns, shape=(-1, 1))
 
         advantage = actual_returns - critic_returns
 
-        print(action_probs.shape)
-        print(critic_returns.shape)
-        print(actual_returns.shape)
-
-        print(advantage.shape)
-
         self.plot_ret(actual_returns, advantage, critic_returns)
 
-        actor_losses = self.nn.actor_loss(action_probs, advantage)
+        actor_losses = self.actor_loss(action_probs, advantage)
         actor_losses = self.normalize(actor_losses)
         actor_losses = tf.math.multiply(actor_losses, self.actor_loss_multiplier)
 
-        entropy_loss = self.get_entropy_loss(action_probs)
-        entropy_loss = self.normalize(entropy_loss)
-        entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
+        # entropy_loss = self.get_entropy_loss(action_probs_max)
+        # entropy_loss = self.standardize(entropy_loss)
+        # entropy_loss = self.normalize(entropy_loss)
+        # entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
 
-        critic_losses = self.nn.critic_loss(critic_returns, actual_returns)
+        critic_losses = self.critic_loss(critic_returns, actual_returns)
         critic_losses = self.normalize(critic_losses)
         critic_losses = tf.math.multiply(critic_losses, self.critic_loss_multiplier)
 
-        total_losses = tf.math.add(actor_losses, critic_losses, entropy_loss)
+        total_losses = actor_losses + critic_losses
+        # total_losses = self.normalize(total_losses)
+        # total_losses = tf.clip_by_value(total_losses, clip_value_min=-1, clip_value_max=1)
 
         self.plot_loss(actor_losses, critic_losses, total_losses, entropy_loss=entropy_loss)
 
@@ -194,7 +195,7 @@ class A2CAgent(BaseAgent):
                                 "color": "salmon"
                         },
                         {
-                                "args" : [total_losses],
+                                "args" : [tf.squeeze(total_losses)],
                                 "label": "Total Loss",
                                 "color": "black"
                         }
@@ -208,7 +209,7 @@ class A2CAgent(BaseAgent):
                         }
                 ],
                 "title"  : f"A2C Losses ({self.env.name}): {self.nn.name} + "
-                           f"{self.nn.critic_loss.__class__.__name__} + "
+                           f"{self.critic_loss.__class__.__name__} + "
                            f"{self.nn.optimizer.__class__.__name__} - "
                            f"LR: {self.nn.learning_rate}",
         }
@@ -228,7 +229,7 @@ def main():
 
     nn = Network("transformer",
                  env.num_states, env.num_actions,
-                 max_timesteps=5, learning_rate=0.000001)
+                 max_timesteps=15, learning_rate=0.0001)
     agent = A2CAgent(nn)
 
     exp = Experiment(env, agent, use_wandb=False)
