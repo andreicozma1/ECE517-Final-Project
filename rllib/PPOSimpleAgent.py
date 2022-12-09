@@ -15,16 +15,12 @@ from rllib.Network import Network
 from rllib.PlotHelper import PlotHelper
 from rllib.utils import logging_setup
 from rllib.Buffer import Buffer
+
 keras = tf.keras
 eps = np.finfo(np.float32).eps.item()
 
 
-# class BaseAgent:
-keras = tf.keras
-eps = np.finfo(np.float32).eps.item()
-
-
-class PPOAgent(BaseAgent):
+class PPOSimpleAgent(BaseAgent):
 
     def __init__(self, nn: Network,
                  epsilon: float = 0.2,
@@ -59,51 +55,22 @@ class PPOAgent(BaseAgent):
         returns = returns.stack()[::-1]
         return returns
 
-    def get_inputs(self, curr_timestep, curr_observation, buffer):
-        states, actions, rewards = buffer.observation_buffer.stack(), buffer.action_buffer.stack(), buffer.reward_buffer.stack()
-        trajectory_start_index = buffer.trajectory_start_index
-        t = curr_timestep - trajectory_start_index
+    def get_inputs(self, curr_timestep, curr_observation, state_hist, actions_hist, rewards_hist, stack=True):
+        print("=" * 80)
+        # print("curr_timestep", curr_timestep)
+        if stack:
+            states, actions, rewards = state_hist.stack(), actions_hist.stack(), rewards_hist.stack()
+        else:
+            states, actions, rewards = state_hist, actions_hist, rewards_hist
+        # self.nn.max_timesteps
 
-        # actions = tf.expand_dims(actions, axis=0)
+        print(curr_observation)
+        print(states)
         # print(states)
-        # print(curr_observation)
-        # print('*'*100)
-        # print('curr_time_step', curr_timestep)
-        # print('trajectory_start_index', trajectory_start_index)
-        states = tf.transpose(states, perm=[1, 0, 2])
-        states = tf.concat([states, tf.expand_dims(curr_observation, axis=0)], axis=1)
-
-        # print('states', states.shape)
-        # print('actions', actions.shape)
-        # print('-'*100)
-
-        # getting the index to last N states, actions
-        idx_start = curr_timestep - self.nn.max_timesteps + 1 if t >= self.nn.max_timesteps else trajectory_start_index
-        idx = tf.range(start=idx_start, limit=curr_timestep + 1, delta=1)
-        idx = tf.clip_by_value(idx, clip_value_min=trajectory_start_index-1, clip_value_max=curr_timestep)
-        # positional array
-        pos_s = tf.range(start=t - self.nn.max_timesteps + 1, limit=t + 1, delta=1)
-        pos_s = tf.clip_by_value(pos_s, clip_value_min=-1, clip_value_max=t)
-
-
-
-        # print('idx', idx)
-        # print('pos_s', pos_s)
-        states = tf.gather(states, idx, axis=1)
-        actions = tf.one_hot(actions, depth=self.nn.num_actions)
-        actions = tf.gather(actions, idx, axis=0)
-        # print('states', states.shape)
-        # print('actions', actions.shape)
-        if t < self.nn.max_timesteps:
-            states = tf.concat([tf.zeros(shape=(1, self.nn.max_timesteps - t - 1, self.nn.num_features)), states], axis=1)
-            actions = tf.concat([tf.zeros(shape=(self.nn.max_timesteps - t - 1 , self.nn.num_actions)), actions], axis=0)
-        # print('states',states)
-        # print('actions', actions)
-
-        positions = tf.reshape(pos_s, shape=self.nn.inp_p_shape)
-        states = tf.reshape(states, shape=self.nn.inp_s_shape)
-        actions = tf.reshape(actions, shape=self.nn.inp_a_shape)
-        return [positions, states, actions]
+        state = states[-states:]
+        if states.shape[0] < self.nn.max_timesteps:
+            state = tf.pad(state, [[self.nn.max_timesteps - states.shape[0], 0], [0, 0]])
+        return [state]
 
     def get_action(self, model_outputs, deterministic):
         action_logits_t, _ = model_outputs
@@ -138,10 +105,12 @@ class PPOAgent(BaseAgent):
 
         for t in tf.range(self.steps_per_epoch):
             # Get the logits, action, and take one step in the environment
-            model_inputs = self.get_inputs(t,
-                                           observation,
-                                           buffer)
-            model_outputs = self.nn.model(model_inputs)
+            # model_inputs = self.get_inputs(t,
+            #                                observation,
+            #                                buffer.observation_buffer,
+            #                                buffer.action_buffer,
+            #                                buffer.reward_buffer, stack=True)
+            model_outputs = self.nn.model(tf.expand_dims(observation, axis=1))
             action: tf.Tensor = self.get_action(model_outputs, deterministic)
             observation_new, reward, done = env.tf_step(action)
             episode_return += reward
@@ -190,20 +159,17 @@ class PPOAgent(BaseAgent):
         (
             _, _, advantage_buffer, return_buffer, _, value_buffer, _
         ) = rollout_data
-        return_buffer = self.normalize(return_buffer)
-        value_buffer = self.normalize(value_buffer)
         self.plot_ret(return_buffer, advantage_buffer, value_buffer)
 
         print("=" * 80)
         print("Training on generated data")
         for e in range(self.train_iterations):
-            print(f"Epoch {e} / {self.train_iterations}")
-            loss = self.update(buffer, hist_model_o)
-        del buffer
+            loss = self.update(rollout_data, hist_model_o)
+
         return rollout_data, hist_model_o, loss
 
     # @tf.function
-    def update(self, buffer, hist_model_o):
+    def update(self, rollout_data, hist_model_out: list):
         (
             observation_buffer,
             action_buffer,
@@ -212,45 +178,26 @@ class PPOAgent(BaseAgent):
             log_prob_buffer,
             value_buffer,
             reward_buffer
-        ) = buffer.get()
-        episode_indices = buffer.episode_indices
-        new_log_prob_buffer = tf.TensorArray(dtype=tf.float32, size=0,
-                                             dynamic_size=True,
-                                             element_shape=1)
+        ) = rollout_data
+
         # self.plot_ret(return_buffer, advantage_buffer, value_buffer)
         with tf.GradientTape() as tape:  # Record operations for automatic differentiation.
-            for i in range(len(episode_indices) - 1):
-                for t in range(episode_indices[i], episode_indices[i + 1]):
-                    buffer.trajectory_start_index = i
-                    model_inputs = self.get_inputs(t,
-                                                   observation_buffer[t],
-                                                   buffer)
-                    model_outputs = self.nn.model(model_inputs)
-                    logits, value_t = model_outputs
-                    value_t = tf.squeeze(value_t)
-                    logits = logits[0]
-                    log_prob_t = self.get_log_probs(logits, tf.expand_dims(action_buffer[t], axis=0))
-                    new_log_prob_buffer = new_log_prob_buffer.write(t, log_prob_t)
-            new_log_prob_buffer = new_log_prob_buffer.stack()
-
+            action_probs, value_t = self.nn.model(observation_buffer)
+            new_log_prob = self.get_log_probs(tf.squeeze(action_probs, axis=1), action_buffer)
             ratio = tf.exp(
-                new_log_prob_buffer
+                new_log_prob
                 - log_prob_buffer
             )
             min_advantage = tf.where(
                 advantage_buffer > 0,
                 (1 + self.clip_ratio) * advantage_buffer,
                 (1 - self.clip_ratio) * advantage_buffer,
-                )
+            )
             # min_advantage = tf.clip_by_value(advantage_buffer, clip_value_min=1-self.clip_ratio, clip_value_max=1 + self.clip_ratio)
             policy_loss = -tf.reduce_mean(tf.minimum(ratio * advantage_buffer, min_advantage))
-
-            # return_buffer = self.normalize(return_buffer)
-            # value_t = self.normalize(value_t)
             value_loss = tf.reduce_mean((return_buffer - value_t) ** 2)
             total_loss = tf.math.add(policy_loss, value_loss)
             loss = tf.reduce_sum(total_loss)
-
         grads = tape.gradient(loss, self.nn.model.trainable_variables)
         # Apply the gradients to the model's parameters
         self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
@@ -270,7 +217,6 @@ class PPOAgent(BaseAgent):
                     "color": "green"
                 },
                 {
-
                     "args": [tf.squeeze(advantage)],
                     "label": "Advantage",
                     "color": "purple"
@@ -348,3 +294,5 @@ class PPOAgent(BaseAgent):
             })
 
         PlotHelper.plot_from_dict(plot_losses, savefig="plots/ppo_losses.pdf")
+
+# %%

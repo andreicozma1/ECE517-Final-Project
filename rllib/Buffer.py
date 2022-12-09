@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+
 class Buffer:
     # Buffer for storing trajectories
     def __init__(self, obs_dim, log_prob_dim, gamma=0.99, lam=0.95):
@@ -14,6 +15,7 @@ class Buffer:
 
         self.gamma, self.lam = gamma, lam
         self.pointer, self.trajectory_start_index = 0, 0
+        self.episode_indices = [0]
 
     def store(self, observation, action, reward, value, log_prob):
         # Append one step of agent-environment interaction
@@ -47,10 +49,10 @@ class Buffer:
             self.return_buffer = self.return_buffer.write(path_slice.start + t, ret)
 
         self.trajectory_start_index = self.pointer
+        self.episode_indices.append(self.trajectory_start_index)
 
     def get(self):
         # Get all data of the buffer and normalize the advantages
-
         advantage_buffer = self.advantage_buffer.stack()
         advantage_buffer = (advantage_buffer - tf.math.reduce_mean(advantage_buffer)) \
                            / (tf.math.reduce_std(advantage_buffer) + 1e-10)
@@ -63,7 +65,6 @@ class Buffer:
             self.value_buffer.stack(),
             self.reward_buffer.stack()
         )
-
 
     @staticmethod
     def create_buffer(shape, dtype):
