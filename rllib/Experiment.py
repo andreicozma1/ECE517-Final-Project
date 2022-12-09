@@ -120,8 +120,8 @@ class PPOExperiment(Experiment):
 
         tq = tqdm.trange(max_episodes, desc="Train", leave=True)
         for _ in tq:
-            hist_sar, _, loss = self.agent.train_step(self.env, max_steps_per_episode)
-            _, _, hist_rewards, _ = hist_sar
+            buffer_data, _, loss = self.agent.train_step(self.env, max_steps_per_episode)
+            _, _, _, _, _, _, hist_rewards = buffer_data
             rewards, loss = hist_rewards.numpy(), loss.numpy()
             total_steps, total_reward, total_loss = len(rewards), np.sum(rewards), np.sum(loss)
             running_reward.append(total_reward)
@@ -141,3 +141,4 @@ class PPOExperiment(Experiment):
             wandb.log(stats)
 
         return stats
+
