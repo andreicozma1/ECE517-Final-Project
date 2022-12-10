@@ -7,13 +7,9 @@ import numpy as np
 import tensorflow as tf
 
 from rllib.BaseEnvironment import BaseEnvironment
-from rllib.Network import Network
 from rllib.BaseAgent import BaseAgent
-from rllib.Environments import LunarLander
-from rllib.Experiment import Experiment
-from rllib.Network import Network
+from rllib.Networks import TransformerNetwork
 from rllib.PlotHelper import PlotHelper
-from rllib.utils import logging_setup
 from rllib.Buffer import Buffer
 
 keras = tf.keras
@@ -22,7 +18,7 @@ eps = np.finfo(np.float32).eps.item()
 
 class PPOSimpleAgent(BaseAgent):
 
-    def __init__(self, nn: Network,
+    def __init__(self, nn: TransformerNetwork,
                  epsilon: float = 0.2,
                  gamma: float = 0.97,
                  steps_per_epoch: int = 4000,
@@ -86,7 +82,7 @@ class PPOSimpleAgent(BaseAgent):
         # Compute the log-probabilities of taking actions a by using the logits (i.e. the output of the actor)
         logprobabilities_all = tf.nn.log_softmax(logits)
         logprobability = tf.reduce_sum(
-            tf.one_hot(a, self.nn.num_actions) * logprobabilities_all, axis=1
+                tf.one_hot(a, self.nn.num_actions) * logprobabilities_all, axis=1
         )
         return logprobability
 
@@ -157,7 +153,7 @@ class PPOSimpleAgent(BaseAgent):
         rollout_data = buffer.get()
 
         (
-            _, _, advantage_buffer, return_buffer, _, value_buffer, _
+                _, _, advantage_buffer, return_buffer, _, value_buffer, _
         ) = rollout_data
         self.plot_ret(return_buffer, advantage_buffer, value_buffer)
 
@@ -171,13 +167,13 @@ class PPOSimpleAgent(BaseAgent):
     # @tf.function
     def update(self, rollout_data, hist_model_out: list):
         (
-            observation_buffer,
-            action_buffer,
-            advantage_buffer,
-            return_buffer,
-            log_prob_buffer,
-            value_buffer,
-            reward_buffer
+                observation_buffer,
+                action_buffer,
+                advantage_buffer,
+                return_buffer,
+                log_prob_buffer,
+                value_buffer,
+                reward_buffer
         ) = rollout_data
 
         # self.plot_ret(return_buffer, advantage_buffer, value_buffer)
@@ -185,13 +181,13 @@ class PPOSimpleAgent(BaseAgent):
             action_probs, value_t = self.nn.model(observation_buffer)
             new_log_prob = self.get_log_probs(tf.squeeze(action_probs, axis=1), action_buffer)
             ratio = tf.exp(
-                new_log_prob
-                - log_prob_buffer
+                    new_log_prob
+                    - log_prob_buffer
             )
             min_advantage = tf.where(
-                advantage_buffer > 0,
-                (1 + self.clip_ratio) * advantage_buffer,
-                (1 - self.clip_ratio) * advantage_buffer,
+                    advantage_buffer > 0,
+                    (1 + self.clip_ratio) * advantage_buffer,
+                    (1 - self.clip_ratio) * advantage_buffer,
             )
             # min_advantage = tf.clip_by_value(advantage_buffer, clip_value_min=1-self.clip_ratio, clip_value_max=1 + self.clip_ratio)
             policy_loss = -tf.reduce_mean(tf.minimum(ratio * advantage_buffer, min_advantage))
@@ -205,92 +201,92 @@ class PPOSimpleAgent(BaseAgent):
 
     def plot_ret(self, actual_returns, advantage, critic_returns):
         plot_returns = {
-            "plot": [
-                {
-                    "args": [tf.squeeze(critic_returns)],
-                    "label": "Critic Val",
-                    "color": "red"
-                },
-                {
-                    "args": [tf.squeeze(actual_returns)],
-                    "label": "Actual Val",
-                    "color": "green"
-                },
-                {
-                    "args": [tf.squeeze(advantage)],
-                    "label": "Advantage",
-                    "color": "purple"
-                }
-            ],
-            "fill_between": [
-                {
-                    "args": [tf.range(tf.shape(actual_returns)[0]), tf.squeeze(actual_returns),
-                             tf.squeeze(critic_returns)],
-                    "where": tf.squeeze(actual_returns) > tf.squeeze(critic_returns),
-                    "color": "green",
-                    "alpha": 0.15
-                },
-                {
-                    "args": [tf.range(tf.shape(actual_returns)[0]), tf.squeeze(actual_returns),
-                             tf.squeeze(critic_returns)],
-                    "where": tf.squeeze(actual_returns) < tf.squeeze(critic_returns),
-                    "color": "red",
-                    "alpha": 0.15
-                }
-            ],
-            "axhline": [
-                {
-                    "y": 0,
-                    "color": "black",
-                    "linestyle": "--"
-                }
-            ],
-            "suptitle": f"PPO Returns ({self.env.name}): "
-                        f"{self.nn.name} - {self.nn.inp_s_shape}" +
-                        f" + ({self.env.state_scaler.__class__.__name__})"
-            if self.env.state_scaler_enable is True else "",
+                "plot"        : [
+                        {
+                                "args" : [tf.squeeze(critic_returns)],
+                                "label": "Critic Val",
+                                "color": "red"
+                        },
+                        {
+                                "args" : [tf.squeeze(actual_returns)],
+                                "label": "Actual Val",
+                                "color": "green"
+                        },
+                        {
+                                "args" : [tf.squeeze(advantage)],
+                                "label": "Advantage",
+                                "color": "purple"
+                        }
+                ],
+                "fill_between": [
+                        {
+                                "args" : [tf.range(tf.shape(actual_returns)[0]), tf.squeeze(actual_returns),
+                                          tf.squeeze(critic_returns)],
+                                "where": tf.squeeze(actual_returns) > tf.squeeze(critic_returns),
+                                "color": "green",
+                                "alpha": 0.15
+                        },
+                        {
+                                "args" : [tf.range(tf.shape(actual_returns)[0]), tf.squeeze(actual_returns),
+                                          tf.squeeze(critic_returns)],
+                                "where": tf.squeeze(actual_returns) < tf.squeeze(critic_returns),
+                                "color": "red",
+                                "alpha": 0.15
+                        }
+                ],
+                "axhline"     : [
+                        {
+                                "y"        : 0,
+                                "color"    : "black",
+                                "linestyle": "--"
+                        }
+                ],
+                "suptitle"    : f"PPO Returns ({self.env.name}): "
+                                f"{self.nn.name} - {self.nn.inp_s_shape}" +
+                                f" + ({self.env.state_scaler.__class__.__name__})"
+                if self.env.state_scaler_enable is True else "",
         }
         PlotHelper.plot_from_dict(plot_returns, savefig="plots/ppo_returns.pdf")
 
     def plot_loss(self, clip_losses, value_losses, total_losses, entropy_loss=None):
         # pass
         plot_losses = {
-            "plot": [
-                {
-                    "args": [tf.squeeze(clip_losses)],
-                    "label": "Clip Loss",
-                    "color": "lightskyblue"
-                },
-                {
-                    "args": [tf.squeeze(value_losses)],
-                    "label": "Value Loss",
-                    "color": "salmon"
-                },
-                {
-                    "args": [total_losses],
-                    "label": "Total Loss",
-                    "color": "black"
-                }
+                "plot"   : [
+                        {
+                                "args" : [tf.squeeze(clip_losses)],
+                                "label": "Clip Loss",
+                                "color": "lightskyblue"
+                        },
+                        {
+                                "args" : [tf.squeeze(value_losses)],
+                                "label": "Value Loss",
+                                "color": "salmon"
+                        },
+                        {
+                                "args" : [total_losses],
+                                "label": "Total Loss",
+                                "color": "black"
+                        }
 
-            ],
-            "axhline": [
-                {
-                    "y": 0,
-                    "color": "black",
-                    "linestyle": "--"
-                }
-            ],
-            "title": f"PPO Losses ({self.env.name}):"
-            # f" {self.nn.name} + "
-            # f"{self.nn.critic_loss.__class__.__name__} + "
-            # f"{self.nn.optimizer.__class__.__name__} - "
-            # f"LR: {self.nn.learning_rate}",
+                ],
+                "axhline": [
+                        {
+                                "y"        : 0,
+                                "color"    : "black",
+                                "linestyle": "--"
+                        }
+                ],
+                "title"  : f"PPO Losses ({self.env.name}):"
+                # f" {self.nn.name} + "
+                # f"{self.nn.critic_loss.__class__.__name__} + "
+                # f"{self.nn.optimizer.__class__.__name__} - "
+                # f"LR: {self.nn.learning_rate}",
         }
         if entropy_loss is not None:
             plot_losses["plot"].append({
-                "args": [tf.squeeze(entropy_loss)],
-                "label": "Entropy Loss",
-                "color": "darkorange"
+                    "args" : [tf.squeeze(entropy_loss)],
+                    "label": "Entropy Loss",
+                    "color": "darkorange"
             })
 
         PlotHelper.plot_from_dict(plot_losses, savefig="plots/ppo_losses.pdf")

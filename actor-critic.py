@@ -1,18 +1,18 @@
 import logging
 import pprint
 import random
-from typing import Tuple
 
 import numpy as np
 import tensorflow as tf
 
 # This is a hacky fix for tensorflow imports to work with intellisense
 from rllib.BaseAgent import BaseAgent
-from rllib.CustomLayers import ActorLoss
+from rllib.layers.Losses import ActorLoss
 from rllib.Environments import LunarLander
 from rllib.Experiment import Experiment
 from rllib.Network import Network
 from rllib.PlotHelper import PlotHelper
+from rllib.nn.Losses import A2CLoss
 from rllib.utils import logging_setup
 
 # Logging to stdout and file with logging class
@@ -42,95 +42,117 @@ class A2CAgent(BaseAgent):
         self.actor_loss_multiplier = actor_loss_multiplier
         self.critic_loss_multiplier = critic_loss_multiplier
         self.entropy_loss_multiplier = entropy_loss_multiplier
-        self.critic_loss = keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
-        self.actor_loss = ActorLoss(reduction=tf.keras.losses.Reduction.NONE)
+        self.loss = A2CLoss()
+
         logging.info(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
-    def get_inputs(self, curr_timestep, state_hist, actions_hist, rewards_hist):
-        # print("=" * 80)
-        # print("curr_timestep", curr_timestep)
-        states, actions, rewards = state_hist.stack(), actions_hist.stack(), rewards_hist.stack()
-        # print("s", states)
-        # print("a", actions)
-        # print("r", rewards)
+    def get_inputs(self, curr_timestep, curr_observation, buffer):
+        states, actions, rewards = buffer.observation_buffer.stack(), buffer.action_buffer.stack(), buffer.reward_buffer.stack()
+        trajectory_start_index = buffer.trajectory_start_index
+        t = curr_timestep - trajectory_start_index
 
-        pos_s = tf.range(start=curr_timestep - self.nn.max_timesteps + 1, limit=curr_timestep + 1, delta=1)
-        pos_s = tf.clip_by_value(pos_s, clip_value_min=-1, clip_value_max=curr_timestep)
+        # actions = tf.expand_dims(actions, axis=0)
+        states = tf.transpose(states, perm=[1, 0, 2])
+        states = tf.concat([states, tf.expand_dims(curr_observation, axis=0)], axis=1)
 
-        states = tf.gather(states, pos_s, axis=0)
+        # getting the index to last N states, actions
+        idx_start = curr_timestep - self.nn.max_timesteps + 1 if t >= self.nn.max_timesteps else trajectory_start_index
+        idx = tf.range(start=idx_start, limit=curr_timestep + 1, delta=1)
+        idx = tf.clip_by_value(idx, clip_value_min=trajectory_start_index - 1, clip_value_max=curr_timestep)
+        # positional array
+        pos_s = tf.range(start=t - self.nn.max_timesteps + 1, limit=t + 1, delta=1)
+        pos_s = tf.clip_by_value(pos_s, clip_value_min=-1, clip_value_max=t)
 
+        states = tf.gather(states, idx, axis=1)
         actions = tf.one_hot(actions, depth=self.nn.num_actions)
-        actions = tf.gather(actions, pos_s, axis=0)
+        actions = tf.gather(actions, idx, axis=0)
+
+        if t < self.nn.max_timesteps:
+            states = tf.concat([tf.zeros(shape=(1, self.nn.max_timesteps - t - 1, self.nn.num_features)), states],
+                               axis=1)
+            actions = tf.concat([tf.zeros(shape=(self.nn.max_timesteps - t - 1, self.nn.num_actions)), actions], axis=0)
 
         positions = tf.reshape(pos_s, shape=self.nn.inp_p_shape)
         states = tf.reshape(states, shape=self.nn.inp_s_shape)
         actions = tf.reshape(actions, shape=self.nn.inp_a_shape)
-        # print("positions", positions)
-        # print("states", states)
-        # print("actions", actions)
-        # print("=" * 80)
-
         return [positions, states, actions]
 
+    # def get_inputs(self, curr_timestep, state_hist, actions_hist, rewards_hist):
+    #     # print("=" * 80)
+    #     # print("curr_timestep", curr_timestep)
+    #     states, actions, rewards = state_hist.stack(), actions_hist.stack(), rewards_hist.stack()
+    #     # print("s", states)
+    #     # print("a", actions)
+    #     # print("r", rewards)
+    #
+    #     pos_s = tf.range(start=curr_timestep - self.nn.max_timesteps + 1, limit=curr_timestep + 1, delta=1)
+    #     pos_s = tf.clip_by_value(pos_s, clip_value_min=-1, clip_value_max=curr_timestep)
+    #
+    #     states = tf.gather(states, pos_s, axis=0)
+    #
+    #     actions = tf.one_hot(actions, depth=self.nn.num_actions)
+    #     actions = tf.gather(actions, pos_s, axis=0)
+    #
+    #     positions = tf.reshape(pos_s, shape=self.nn.inp_p_shape)
+    #     states = tf.reshape(states, shape=self.nn.inp_s_shape)
+    #     actions = tf.reshape(actions, shape=self.nn.inp_a_shape)
+    #     # print("positions", positions)
+    #     # print("states", states)
+    #     # print("actions", actions)
+    #     # print("=" * 80)
+    #
+    #     return [positions, states, actions]
+
     def get_action(self, model_outputs, deterministic):
-        action_logits_t, critic_value = model_outputs
-        action_logits_t = tf.reshape(action_logits_t, shape=(1, self.nn.num_actions))
-        action = tf.random.categorical(action_logits_t, 1)[0, 0]
-        action_probs_t = tf.nn.softmax(action_logits_t)
-        if deterministic:
-            action = tf.argmax(action_probs_t, axis=1)[0]
-        action = tf.cast(action, tf.int32)
-        return action
+        return self.get_action_1(model_outputs, deterministic)
 
     def compute_loss(self, hist_sar, hist_model_out: list):
-        hist_states, hist_actions, hist_rewards = hist_sar
-        action_probs, critic_returns = hist_model_out
-        action_probs = tf.stack(action_probs, axis=1)
-        critic_returns = tf.stack(critic_returns, axis=1)
+        return self.loss(hist_sar, hist_model_out)
 
-        action_probs = tf.nn.softmax(action_probs, axis=-1)
-        entropy_loss = self.get_entropy_loss(action_probs)
-        entropy_loss = self.normalize(entropy_loss)
-        entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
-        action_probs = tf.reduce_max(action_probs, axis=-1)
-
-        actual_returns = self.expected_return(hist_rewards)
-        actual_returns = self.normalize(actual_returns)
-        critic_returns = self.normalize(critic_returns)
-
-        # action_probs_max = tf.reshape(action_probs_max, shape=(-1, 1))
-        critic_returns = tf.reshape(critic_returns, shape=(-1, 1))
-        actual_returns = tf.reshape(actual_returns, shape=(-1, 1))
-
-        advantage = actual_returns - critic_returns
-
-        self.plot_ret(actual_returns, advantage, critic_returns)
-
-        actor_losses = self.actor_loss(action_probs, advantage)
-        actor_losses = self.normalize(actor_losses)
-        actor_losses = tf.math.multiply(actor_losses, self.actor_loss_multiplier)
-
-        # entropy_loss = self.get_entropy_loss(action_probs_max)
-        # entropy_loss = self.standardize(entropy_loss)
-        # entropy_loss = self.normalize(entropy_loss)
-        # entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
-
-        critic_losses = self.critic_loss(critic_returns, actual_returns)
-        critic_losses = self.normalize(critic_losses)
-        critic_losses = tf.math.multiply(critic_losses, self.critic_loss_multiplier)
-
-        total_losses = actor_losses + critic_losses
-        # total_losses = self.normalize(total_losses)
-        # total_losses = tf.clip_by_value(total_losses, clip_value_min=-1, clip_value_max=1)
-
-        self.plot_loss(actor_losses, critic_losses, total_losses, entropy_loss=entropy_loss)
-
-        return tf.reduce_sum(total_losses)
-
-    def get_entropy_loss(self, action_probs: tf.Tensor) -> tf.Tensor:
-        entropy_loss = tf.math.multiply(action_probs, tf.math.log(action_probs))
-        entropy_loss = -1 * tf.reduce_sum(entropy_loss, axis=-1)
-        return entropy_loss
+    # def compute_loss(self, hist_sar, hist_model_out: list):
+    #     hist_states, hist_actions, hist_rewards = hist_sar
+    #     action_probs, critic_returns = hist_model_out
+    #     action_probs = tf.stack(action_probs, axis=1)
+    #     critic_returns = tf.stack(critic_returns, axis=1)
+    #
+    #     action_probs = tf.nn.softmax(action_probs, axis=-1)
+    #     entropy_loss = self.get_entropy_loss(action_probs)
+    #     entropy_loss = self.normalize(entropy_loss)
+    #     entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
+    #     action_probs = tf.reduce_max(action_probs, axis=-1)
+    #
+    #     actual_returns = self.expected_return(hist_rewards)
+    #     actual_returns = self.normalize(actual_returns)
+    #     critic_returns = self.normalize(critic_returns)
+    #
+    #     # action_probs_max = tf.reshape(action_probs_max, shape=(-1, 1))
+    #     critic_returns = tf.reshape(critic_returns, shape=(-1, 1))
+    #     actual_returns = tf.reshape(actual_returns, shape=(-1, 1))
+    #
+    #     advantage = actual_returns - critic_returns
+    #
+    #     self.plot_ret(actual_returns, advantage, critic_returns)
+    #
+    #     actor_losses = self.actor_loss(action_probs, advantage)
+    #     actor_losses = self.normalize(actor_losses)
+    #     actor_losses = tf.math.multiply(actor_losses, self.actor_loss_multiplier)
+    #
+    #     # entropy_loss = self.get_entropy_loss(action_probs_max)
+    #     # entropy_loss = self.standardize(entropy_loss)
+    #     # entropy_loss = self.normalize(entropy_loss)
+    #     # entropy_loss = tf.math.multiply(entropy_loss, self.entropy_loss_multiplier)
+    #
+    #     critic_losses = self.critic_loss(critic_returns, actual_returns)
+    #     critic_losses = self.normalize(critic_losses)
+    #     critic_losses = tf.math.multiply(critic_losses, self.critic_loss_multiplier)
+    #
+    #     total_losses = actor_losses + critic_losses
+    #     # total_losses = self.normalize(total_losses)
+    #     # total_losses = tf.clip_by_value(total_losses, clip_value_min=-1, clip_value_max=1)
+    #
+    #     self.plot_loss(actor_losses, critic_losses, total_losses, entropy_loss=entropy_loss)
+    #
+    #     return tf.reduce_sum(total_losses)
 
     def plot_ret(self, actual_returns, advantage, critic_returns):
         plot_returns = {
@@ -227,8 +249,7 @@ def main():
     # env = PongEnvironment(draw=True, draw_speed=None, state_scaler_enable=True)
     env = LunarLander(draw=True, draw_speed=None, state_scaler_enable=True)
 
-    nn = Network("transformer",
-                 env.num_states, env.num_actions,
+    nn = Network(env.num_states, env.num_actions,
                  max_timesteps=15, learning_rate=0.0001)
     agent = A2CAgent(nn)
 

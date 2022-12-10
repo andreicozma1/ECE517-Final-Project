@@ -16,8 +16,7 @@ class BaseEnvironment:
                  num_states: int,
                  num_actions: int,
                  base_folder="./saves/",
-                 state_scaling: bool = True,
-                 append_n_actions: int = 0):
+                 state_scaling: bool = True):
         self.name: str = name
         self.num_states: int = num_states
         self.num_actions: int = num_actions
