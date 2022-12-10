@@ -16,9 +16,11 @@ from torch.utils.data import DataLoader
 from torch.utils.data.dataset import IterableDataset
 import matplotlib.pyplot as plt
 import pytorch_lightning as pl
-from pl_bolts.models.rl import AdvantageActorCritic
+# from pl_bolts.models.rl import AdvantageActorCritic
 import torch
-from pl_bolts.models.rl.ppo_model import PPO
+# from pl_bolts.models.rl.ppo_model import PPO
+from rllib.advantage_actor_critic_model import AdvantageActorCritic
+from rllib.ppo_model import PPO
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
 
