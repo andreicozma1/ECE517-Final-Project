@@ -1,18 +1,10 @@
 import argparse
-import hashlib
 import os
-
-# from pl_bolts.models.rl import AdvantageActorCritic
-import sys
 
 import torch
 from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
-# from pl_bolts.models.rl.ppo_model import PPO
-from rllib.A2CExample import AdvantageActorCritic
-from rllib.PPO1 import PPO1
-from rllib.PPOExample import PPO
+from rllib.Utils import get_logger, get_model, get_model_hash
 
 
 def train(args, model_params={}):
@@ -23,33 +15,11 @@ def train(args, model_params={}):
     wandb_proj = args.wandb_project
     log_dir = args.log_dir
 
-    # setup model
-    models = {
-            "ppo"      : PPO(args.env, *model_params),
-            "a2c"      : AdvantageActorCritic(args.env, *model_params),
-            "CustomPPO": PPO1(args.env, *model_params),
-    }
+    model = get_model(env, model_name, model_params)
 
-    if model_name not in models:
-        print(f"ERROR: Model {model_name} not supported")
-        print("Available models:")
-        for model in models:
-            print(f" - {model}")
-        sys.exit(1)
-
-    model = models[model_name]
     model_hash = get_model_hash(model)
     logger = get_logger(wandb_proj, log_dir, model_hash, model_name)
-    # callbacks = []
-    # if args.checkpoint_dir != "":
-    #     checkpoint_callback = ModelCheckpoint(
-    #             dirpath=args.checkpoint_dir,
-    #             every_n_epochs=args.checkpoint_freq,
-    #             verbose=True
-    #         )
-    #     callbacks.append(checkpoint_callback)
 
-    # setup trainer
     trainer = Trainer(
             accelerator="auto",
             devices=1 if torch.cuda.is_available() else None,  # limiting got iPython runs
@@ -63,6 +33,7 @@ def train(args, model_params={}):
             precision=16,
             # callbacks=callbacks
     )
+
     # train
     trainer.fit(model)
     model_save_dir = os.path.join(checkpoint_dir, model_name, env)
@@ -70,21 +41,6 @@ def train(args, model_params={}):
     save_path = os.path.join(model_save_dir, f"{model_hash}.pt")
     print(save_path)
     torch.save(model.state_dict(), save_path)
-
-
-def get_logger(project, log_dir, model_hash, model_name):
-    project = project.strip()
-    if project == "":
-        return CSVLogger(save_dir=log_dir, name=model_hash)
-
-    return WandbLogger(project=project, name=model_hash,
-                       group=model_name, tags=["train"])
-
-
-def get_model_hash(model):
-    m_hash = hashlib.md5(str(model).encode('utf-8')).hexdigest()
-    m_name = f"{m_hash}"
-    return m_name
 
 
 def main():

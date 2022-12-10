@@ -1,25 +1,18 @@
 import collections
 
 import argparse
-import sys
 import time
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
-from rllib.PPO1 import PPO1
-from rllib.examples.A2CExample import AdvantageActorCritic
-from rllib.examples.PPOExample import PPO
+from rllib.Utils import discount_rewards, load_model
 
 
-def eval_model(episode_iterator, args, model_params={}):
+def eval_model(episode_num, args, model_params={}):
     checkpoint_path = args.file_path
-    model_path = checkpoint_path.split('/')
-    model_name, env = model_path[-3], model_path[-2]
-
-    model = get_model(env, model_name, model_params)
-    model.load_state_dict(torch.load(checkpoint_path))
+    model, model_name = load_model(checkpoint_path, model_params)
 
     # setup environemnt
     done = False
@@ -62,32 +55,6 @@ def eval_model(episode_iterator, args, model_params={}):
             'actual_return': actual_return,
             'pred_value'   : pred_value
     }
-
-
-def get_model(env, model_name, model_params):
-    # setup model
-    models = {
-            "ppo_ex": PPO(env, *model_params),
-            "a2c_ex": AdvantageActorCritic(env, *model_params),
-            "ppo_1" : PPO1(env, *model_params),
-    }
-    if model_name not in models:
-        print(f"ERROR: Model {model_name} not supported")
-        print("Available models:")
-        for model in models:
-            print(f" - {model}")
-        sys.exit(1)
-    model = models[model_name]
-    return model
-
-
-def discount_rewards(rewards: list, gamma: float) -> list:
-    cumul_reward = []
-    sum_r = 0.0
-    for r in reversed(rewards):
-        sum_r = (sum_r * gamma) + r
-        cumul_reward.append(sum_r)
-    return list(reversed(cumul_reward))
 
 
 def main():
