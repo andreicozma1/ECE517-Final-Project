@@ -5,53 +5,22 @@ import argparse
 from typing import Any, List, Tuple
 
 import torch
-from pytorch_lightning import LightningModule, Trainer, seed_everything
-from torch import Tensor
+from pytorch_lightning import LightningModule
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
 from pl_bolts.datamodules import ExperienceSourceDataset
 from pl_bolts.models.rl.common.networks import MLP, ActorCategorical, ActorContinous
 from pl_bolts.utils import _GYM_AVAILABLE
-from pl_bolts.utils.stability import under_review
 from pl_bolts.utils.warnings import warn_missing_pkg
-from torch import FloatTensor, Tensor, nn
-from torch.distributions import Categorical, Normal
-from torch.nn import functional as F
+from torch import Tensor
+
+from rllib.CommonBase import CommonBase
 
 if _GYM_AVAILABLE:
     import gym
 else:  # pragma: no cover
     warn_missing_pkg("gym")
-
-
-class CommonBase(nn.Module):
-    """Simple MLP network."""
-
-    def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_size: int = 128):
-        """
-        Args:
-            input_shape: observation shape of the environment
-            n_actions: number of discrete actions available in the environment
-            hidden_size: size of hidden layers
-        """
-        super().__init__()
-        self.net = nn.Sequential(
-                nn.Linear(input_shape[0], hidden_size),
-                nn.ReLU(),
-                nn.Linear(hidden_size, n_actions),
-        )
-
-    def forward(self, input_x):
-        """Forward pass through network.
-
-        Args:
-            x: input to network
-
-        Returns:
-            output of network
-        """
-        return self.net(input_x.float())
 
 
 class CustomPPO(LightningModule):
