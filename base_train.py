@@ -2,6 +2,7 @@ import os
 from collections import OrderedDict, deque, namedtuple
 from typing import Iterator, List, Tuple
 
+import argparse
 import gym
 import numpy as np
 import pandas as pd
@@ -21,19 +22,47 @@ from pl_bolts.models.rl.ppo_model import PPO
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
 
+
 # PATH_DATASETS = os.environ.get("PATH_DATASETS", ".")
+def train(args):
+    # setup model
+    if args.model == "ppo":
+        model = PPO(args.env)
+    elif args.model == "a2c":
+        model = AdvantageActorCritic(args.env)
+    else:
+        raise ValueError("Model not supported")
 
-ppo = PPO("LunarLander-v2")
+    # setup logger
+    if args.wandb_project == "":
+        logger = CSVLogger(save_dir=args.log_dir, name=args.model)
+    else:
+        logger = WandbLogger(project=args.wandb_project)
 
-wandb_logger = WandbLogger(project="rl-final-proj")
+    # setup trainer
+    trainer = Trainer(
+        accelerator="auto",
+        devices=1 if torch.cuda.is_available() else None,  # limiting got iPython runs
+        max_epochs=args.max_epochs,
+        val_check_interval=args.val_check_interval,
+        default_root_dir=args.model_dir,
+        logger=logger
+    )
 
-trainer = Trainer(
-    accelerator="auto",
-    devices=1 if torch.cuda.is_available() else None,  # limiting got iPython runs
-    max_epochs=150,
-    val_check_interval=50,
-    logger=wandb_logger
-)
+    # train
+    trainer.fit(model)
 
-trainer.fit(ppo)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--env", type=str, default="LunarLander-v2")
+    parser.add_argument("--max_epochs", type=int, default=150)
+    parser.add_argument("--val_check_interval", type=int, default=50)
+    parser.add_argument("--model", type=str, default="ppo")
+    parser.add_argument("--log_dir", type=str, default="logs/")
+    parser.add_argument("--model_dir", type=str, default="models/")
+    parser.add_argument("--wandb_project", type=str, default="")
+    args = parser.parse_args()
+
+    train(args)
 
