@@ -1,36 +1,22 @@
 import collections
-import hashlib
-import os
 
 import argparse
-# import gym
 import sys
 import time
 
 import numpy as np
 import torch
-# from pl_bolts.models.rl.ppo_model import PPO
-import tqdm
-from keras.callbacks import CSVLogger
-from pytorch_lightning.loggers import WandbLogger
+from tqdm import tqdm
 
-from rllib.advantage_actor_critic_model import AdvantageActorCritic
-from rllib.custompp import CustomPPO
-from rllib.ppo_model import PPO
+from rllib.PPO1 import PPO1
+from rllib.examples.A2CExample import AdvantageActorCritic
+from rllib.examples.PPOExample import PPO
 
 
-# from pytorch_lightning.loggers import WandbLogger
-# from pytorch_lightning import Trainer
-
-
-def eval_model(i, args, model_params={}):
+def eval_model(episode_iterator, args, model_params={}):
     checkpoint_path = args.file_path
     model_path = checkpoint_path.split('/')
     model_name, env = model_path[-3], model_path[-2]
-    print("=" * 80)
-    print(model_name)
-    print(f" - {model_name}")
-    print(f" - {env}")
 
     model = get_model(env, model_name, model_params)
     model.load_state_dict(torch.load(checkpoint_path))
@@ -81,9 +67,9 @@ def eval_model(i, args, model_params={}):
 def get_model(env, model_name, model_params):
     # setup model
     models = {
-            "ppo"      : PPO(env, *model_params),
-            "a2c"      : AdvantageActorCritic(env, *model_params),
-            "CustomPPO": CustomPPO(env, *model_params),
+            "ppo_ex": PPO(env, *model_params),
+            "a2c_ex": AdvantageActorCritic(env, *model_params),
+            "ppo_1" : PPO1(env, *model_params),
     }
     if model_name not in models:
         print(f"ERROR: Model {model_name} not supported")
@@ -95,24 +81,12 @@ def get_model(env, model_name, model_params):
     return model
 
 
-def discount_rewards(rewards, discount: float):
-    """Calculate the discounted rewards of all rewards in list.
-
-    Args:
-        rewards: list of rewards/advantages
-        discount: discount factor
-
-    Returns:
-        list of discounted rewards/advantages
-    """
-
+def discount_rewards(rewards: list, gamma: float) -> list:
     cumul_reward = []
     sum_r = 0.0
-
     for r in reversed(rewards):
-        sum_r = (sum_r * discount) + r
+        sum_r = (sum_r * gamma) + r
         cumul_reward.append(sum_r)
-
     return list(reversed(cumul_reward))
 
 
@@ -122,11 +96,14 @@ def main():
     num_episodes = args.num_episodes
 
     running_reward: collections.deque = collections.deque(maxlen=running_rew_len)
-    tq_episodes = tqdm.trange(num_episodes, leave=False)
-    for i in tq_episodes:
-        metrics = eval_model(i, args)
+    tq_episode_iter = tqdm(range(num_episodes), leave=False, description="Episode")
+    for episode_number in tq_episode_iter:
+        metrics = eval_model(episode_number, args)
         running_reward.append(metrics['total_reward'])
-        tq_episodes.set_postfix(metrics)
+        metrics |= {
+                "running_reward": np.mean(running_reward),
+        }
+        tq_episode_iter.set_postfix(metrics)
 
 
 def parse_args():

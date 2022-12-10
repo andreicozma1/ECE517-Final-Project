@@ -10,9 +10,9 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
 # from pl_bolts.models.rl.ppo_model import PPO
-from rllib.advantage_actor_critic_model import AdvantageActorCritic
-from rllib.custompp import CustomPPO
-from rllib.ppo_model import PPO
+from rllib.A2CExample import AdvantageActorCritic
+from rllib.PPO1 import PPO1
+from rllib.PPOExample import PPO
 
 
 def train(args, model_params={}):
@@ -27,7 +27,7 @@ def train(args, model_params={}):
     models = {
             "ppo"      : PPO(args.env, *model_params),
             "a2c"      : AdvantageActorCritic(args.env, *model_params),
-            "CustomPPO": CustomPPO(args.env, *model_params),
+            "CustomPPO": PPO1(args.env, *model_params),
     }
 
     if model_name not in models:
@@ -36,7 +36,7 @@ def train(args, model_params={}):
         for model in models:
             print(f" - {model}")
         sys.exit(1)
-        
+
     model = models[model_name]
     model_hash = get_model_hash(model)
     logger = get_logger(wandb_proj, log_dir, model_hash, model_name)

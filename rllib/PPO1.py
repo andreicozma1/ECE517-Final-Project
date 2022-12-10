@@ -23,7 +23,7 @@ else:  # pragma: no cover
     warn_missing_pkg("gym")
 
 
-class CustomPPO(LightningModule):
+class PPO1(LightningModule):
     """PyTorch Lightning implementation of `Proximal Policy Optimization.
 
     <https://arxiv.org/abs/1707.06347>`_
