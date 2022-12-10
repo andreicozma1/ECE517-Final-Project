@@ -1,0 +1,8 @@
+avg_reward_len: 100
+batch_size: 32
+critic_beta: 0.5
+entropy_beta: 0.01
+env: CartPole-v0
+epoch_len: 1000
+gamma: 0.99
+lr: 0.001

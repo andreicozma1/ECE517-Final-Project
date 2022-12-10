@@ -251,7 +251,7 @@ class PPOAgent(BaseAgent):
             total_loss = tf.math.add(policy_loss, value_loss)
             loss = tf.reduce_sum(total_loss)
 
-        grads = tape.gradient(loss, self.nn.model.trainable_variables)
+        grads = tape.gradient([policy_loss, value_loss], self.nn.model.trainable_variables)
         # Apply the gradients to the model's parameters
         self.nn.optimizer.apply_gradients(zip(grads, self.nn.model.trainable_variables))
         return loss
