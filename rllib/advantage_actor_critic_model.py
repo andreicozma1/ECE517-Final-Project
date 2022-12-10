@@ -24,7 +24,6 @@ else:  # pragma: no cover
     warn_missing_pkg("gym")
 
 
-@under_review()
 class AdvantageActorCritic(LightningModule):
     """PyTorch Lightning implementation of `Advantage Actor Critic <https://arxiv.org/abs/1602.01783v2>`_.
 
@@ -41,16 +40,16 @@ class AdvantageActorCritic(LightningModule):
     """
 
     def __init__(
-        self,
-        env: str,
-        gamma: float = 0.99,
-        lr: float = 0.001,
-        batch_size: int = 32,
-        avg_reward_len: int = 100,
-        entropy_beta: float = 0.01,
-        critic_beta: float = 0.5,
-        epoch_len: int = 1000,
-        **kwargs: Any,
+            self,
+            env: str,
+            gamma: float = 0.99,
+            lr: float = 0.001,
+            batch_size: int = 32,
+            avg_reward_len: int = 100,
+            entropy_beta: float = 0.01,
+            critic_beta: float = 0.5,
+            epoch_len: int = 1000,
+            **kwargs: Any,
     ) -> None:
         """
         Args:
@@ -142,7 +141,7 @@ class AdvantageActorCritic(LightningModule):
                     self.state = self.env.reset()
                     self.total_rewards.append(self.episode_reward)
                     self.episode_reward = 0
-                    self.avg_rewards = float(np.mean(self.total_rewards[-self.avg_reward_len :]))
+                    self.avg_rewards = float(np.mean(self.total_rewards[-self.avg_reward_len:]))
 
             _, last_value = self.forward(self.state)
 
@@ -156,10 +155,10 @@ class AdvantageActorCritic(LightningModule):
             self.batch_masks = []
 
     def compute_returns(
-        self,
-        rewards: List[float],
-        dones: List[bool],
-        last_value: Tensor,
+            self,
+            rewards: List[float],
+            dones: List[bool],
+            last_value: Tensor,
     ) -> Tensor:
         """Calculate the discounted rewards of the batched rewards.
 
@@ -184,10 +183,10 @@ class AdvantageActorCritic(LightningModule):
         return returns
 
     def loss(
-        self,
-        states: Tensor,
-        actions: Tensor,
-        returns: Tensor,
+            self,
+            states: Tensor,
+            actions: Tensor,
+            returns: Tensor,
     ) -> Tensor:
         """Calculates the loss for A2C which is a weighted sum of actor loss (MSE), critic loss (PG), and entropy
         (for exploration)
@@ -234,17 +233,17 @@ class AdvantageActorCritic(LightningModule):
         loss = self.loss(states, actions, returns)
 
         log = {
-            "episodes": self.done_episodes,
-            "reward": self.total_rewards[-1],
-            "avg_reward": self.avg_rewards,
+                "episodes"  : self.done_episodes,
+                "reward"    : self.total_rewards[-1],
+                "avg_reward": self.avg_rewards,
         }
         return OrderedDict(
-            {
-                "loss": loss,
-                "avg_reward": self.avg_rewards,
-                "log": log,
-                "progress_bar": log,
-            }
+                {
+                        "loss"        : loss,
+                        "avg_reward"  : self.avg_rewards,
+                        "log"         : log,
+                        "progress_bar": log,
+                }
         )
 
     def configure_optimizers(self) -> List[Optimizer]:
@@ -287,16 +286,15 @@ class AdvantageActorCritic(LightningModule):
         arg_parser.add_argument("--seed", type=int, default=123, help="seed for training run")
 
         arg_parser.add_argument(
-            "--avg_reward_len",
-            type=int,
-            default=100,
-            help="how many episodes to include in avg reward",
+                "--avg_reward_len",
+                type=int,
+                default=100,
+                help="how many episodes to include in avg reward",
         )
 
         return arg_parser
 
 
-@under_review()
 def cli_main() -> None:
     parser = ArgumentParser(add_help=False)
 
