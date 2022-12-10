@@ -11,7 +11,7 @@ import torch
 # from pl_bolts.models.rl.ppo_model import PPO
 import tqdm
 from keras.callbacks import CSVLogger
-from openai.cli import WandbLogger
+from pytorch_lightning.loggers import WandbLogger
 
 from rllib.advantage_actor_critic_model import AdvantageActorCritic
 from rllib.ppo_model import PPO
@@ -22,7 +22,8 @@ from rllib.ppo_model import PPO
 
 
 def eval_model(i, args):
-    model_path = args.checkpoint_path.split('/')
+    checkpoint_path = args.file_path
+    model_path = checkpoint_path.split('/')
     model_type, env = model_path[-3], model_path[-2]
     print(model_type)
 
@@ -35,16 +36,16 @@ def eval_model(i, args):
         raise ValueError("Model not supported")
 
     # load in trained model params
-    model.load_state_dict(torch.load(args.checkpoint_path))
+    model.load_state_dict(torch.load(checkpoint_path))
 
     m_hash = hashlib.md5(str(model).encode('utf-8')).hexdigest()
     m_name = f"{m_hash}-{i}"
     # setup logger
-    if args.wandb_project == "":
-        logger = CSVLogger(save_dir=args.log_dir, name=m_name)
-    else:
-        logger = WandbLogger(project=args.wandb_project, name=m_name,
-                             group=args.model_name, tags=["test"])
+    # if args.wandb_project == "":
+    #     logger = CSVLogger(save_dir=args.log_dir, name=m_name)
+    # else:
+    #     logger = WandbLogger(project=args.wandb_project, name=m_name,
+    #                          group=args.model_name, tags=["test"])
 
     # setup environemnt
     done = False
@@ -53,7 +54,7 @@ def eval_model(i, args):
     pred_value = []
     hist_rewards = []
     while not done:
-        state = state.to(device=model.device)
+        state, next_state, reward, done = state.to(device=model.device), None, None, None
         # api for models are a bit different for getting state and value
         if model_type == "ppo":
             with torch.no_grad():
@@ -111,27 +112,27 @@ def discount_rewards(rewards, discount: float):
 
 def main():
     args = parse_args()
-    running_reward: collections.deque = collections.deque(maxlen=args.running_rew_len)
-    tq_episodes = tqdm.trange(args.num_episodes, leave=False)
+    running_rew_len = args.running_rew_len
+    num_episodes = args.num_episodes
+
+    running_reward: collections.deque = collections.deque(maxlen=running_rew_len)
+    tq_episodes = tqdm.trange(num_episodes, leave=False)
     for i in tq_episodes:
         metrics = eval_model(i, args)
         running_reward.append(metrics['total_reward'])
-
         tq_episodes.set_postfix(metrics)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     # parser.add_argument("--env", type=str, default="LunarLander-v2")
-    parser.add_argument("--checkpoint_path", type=str, required=True)
-    parser.add_argument("-n", "--num_runs", type=str, required=True)
+    parser.add_argument("-f", "--file_path", type=str, required=True)
     parser.add_argument("-ne", "--num_episodes", type=int, default=1)
     parser.add_argument("--running_rew_len", type=int, default=50)
     # Logging and metrics
     parser.add_argument("--log_dir", type=str, default="logs/")
     parser.add_argument("--wandb_project", type=str, default="rl_project")
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
