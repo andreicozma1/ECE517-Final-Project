@@ -7,9 +7,10 @@ import gym
 import numpy as np
 import pandas as pd
 import seaborn as sn
-from IPython.core.display import display
+from datetime import datetime
 from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.loggers import CSVLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 from torch import Tensor, nn
 from torch.optim import Adam, Optimizer
 from torch.utils.data import DataLoader
@@ -25,7 +26,6 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning import Trainer
 
 
-# PATH_DATASETS = os.environ.get("PATH_DATASETS", ".")
 def train(args):
     # setup model
     if args.model == "ppo":
@@ -41,29 +41,45 @@ def train(args):
     else:
         logger = WandbLogger(project=args.wandb_project)
 
+    # setup checkpoints
+    # callbacks = []
+    # if args.checkpoint_dir != "":
+    #     checkpoint_callback = ModelCheckpoint(
+    #             dirpath=args.checkpoint_dir,
+    #             every_n_epochs=args.checkpoint_freq,
+    #             verbose=True
+    #         )
+    #     callbacks.append(checkpoint_callback)
+
     # setup trainer
     trainer = Trainer(
         accelerator="auto",
         devices=1 if torch.cuda.is_available() else None,  # limiting got iPython runs
         max_epochs=args.max_epochs,
         val_check_interval=args.val_check_interval,
-        default_root_dir=args.model_dir,
-        logger=logger
+        logger=logger,
+        enable_checkpointing=True,
+        # callbacks=callbacks
     )
-
     # train
     trainer.fit(model)
+    save_path = os.path.join(args.checkpoint_dir, args.model, datetime.now().isoformat()+".pt")
+    print(save_path)
+    torch.save(model.state_dict(), save_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", type=str, default="LunarLander-v2")
+    parser.add_argument("--model", type=str, default="ppo")
+
     parser.add_argument("--max_epochs", type=int, default=150)
     parser.add_argument("--val_check_interval", type=int, default=50)
-    parser.add_argument("--model", type=str, default="ppo")
+
     parser.add_argument("--log_dir", type=str, default="logs/")
-    parser.add_argument("--model_dir", type=str, default="models/")
     parser.add_argument("--wandb_project", type=str, default="")
+
+    parser.add_argument("--checkpoint_dir", type=str, default="")
     args = parser.parse_args()
 
     train(args)
