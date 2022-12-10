@@ -4,6 +4,7 @@ import os
 
 import argparse
 # import gym
+import sys
 import time
 
 import numpy as np
@@ -14,6 +15,7 @@ from keras.callbacks import CSVLogger
 from pytorch_lightning.loggers import WandbLogger
 
 from rllib.advantage_actor_critic_model import AdvantageActorCritic
+from rllib.custompp import CustomPPO
 from rllib.ppo_model import PPO
 
 
@@ -21,31 +23,17 @@ from rllib.ppo_model import PPO
 # from pytorch_lightning import Trainer
 
 
-def eval_model(i, args):
+def eval_model(i, args, model_params={}):
     checkpoint_path = args.file_path
     model_path = checkpoint_path.split('/')
-    model_type, env = model_path[-3], model_path[-2]
-    print(model_type)
+    model_name, env = model_path[-3], model_path[-2]
+    print("=" * 80)
+    print(model_name)
+    print(f" - {model_name}")
+    print(f" - {env}")
 
-    # setup model
-    if model_type == "ppo":
-        model = PPO(env)
-    elif model_type == "a2c":
-        model = AdvantageActorCritic(env)
-    else:
-        raise ValueError("Model not supported")
-
-    # load in trained model params
+    model = get_model(env, model_name, model_params)
     model.load_state_dict(torch.load(checkpoint_path))
-
-    m_hash = hashlib.md5(str(model).encode('utf-8')).hexdigest()
-    m_name = f"{m_hash}-{i}"
-    # setup logger
-    # if args.wandb_project == "":
-    #     logger = CSVLogger(save_dir=args.log_dir, name=m_name)
-    # else:
-    #     logger = WandbLogger(project=args.wandb_project, name=m_name,
-    #                          group=args.model_name, tags=["test"])
 
     # setup environemnt
     done = False
@@ -54,14 +42,15 @@ def eval_model(i, args):
     pred_value = []
     hist_rewards = []
     while not done:
-        state, next_state, reward, done = state.to(device=model.device), None, None, None
+        state = state.to(device=model.device)
+        next_state, value, reward, done = None, None, None, None
         # api for models are a bit different for getting state and value
-        if model_type == "ppo":
+        if model_name == "ppo":
             with torch.no_grad():
                 pi, action, value = model(state)
             next_state, reward, done, _ = model.env.step(action.cpu().numpy())
 
-        elif model_type == "a2c":
+        elif model_name == "a2c":
             with torch.no_grad():
                 action = model.agent(state, model.device)[0]
                 _, value = model.net(state.reshape((1, -1)))
@@ -87,6 +76,23 @@ def eval_model(i, args):
             'actual_return': actual_return,
             'pred_value'   : pred_value
     }
+
+
+def get_model(env, model_name, model_params):
+    # setup model
+    models = {
+            "ppo"      : PPO(env, *model_params),
+            "a2c"      : AdvantageActorCritic(env, *model_params),
+            "CustomPPO": CustomPPO(env, *model_params),
+    }
+    if model_name not in models:
+        print(f"ERROR: Model {model_name} not supported")
+        print("Available models:")
+        for model in models:
+            print(f" - {model}")
+        sys.exit(1)
+    model = models[model_name]
+    return model
 
 
 def discount_rewards(rewards, discount: float):

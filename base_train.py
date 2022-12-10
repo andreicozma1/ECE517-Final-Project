@@ -3,6 +3,8 @@ import hashlib
 import os
 
 # from pl_bolts.models.rl import AdvantageActorCritic
+import sys
+
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
@@ -29,7 +31,12 @@ def train(args, model_params={}):
     }
 
     if model_name not in models:
-        raise ValueError("Model not supported")
+        print(f"ERROR: Model {model_name} not supported")
+        print("Available models:")
+        for model in models:
+            print(f" - {model}")
+        sys.exit(1)
+        
     model = models[model_name]
     model_hash = get_model_hash(model)
     logger = get_logger(wandb_proj, log_dir, model_hash, model_name)
