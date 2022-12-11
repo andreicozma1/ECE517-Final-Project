@@ -29,4 +29,6 @@ class CommonBase(nn.Module):
         Returns:
             output of network
         """
-        return self.net(input_x.float())
+        x = self.net(input_x.float())
+        print(x.shape)
+        return x

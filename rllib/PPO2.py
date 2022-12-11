@@ -54,12 +54,13 @@ class PPO2(LightningModule):
             lam: float = 0.95,
             lr_actor: float = 3e-4,
             lr_critic: float = 1e-3,
-            max_episode_len: float = 200,
+            max_episode_len: int = 200,
             batch_size: int = 512,
             steps_per_epoch: int = 2048,
             nb_optim_iters: int = 5,
             clip_ratio: float = 0.2,
             hidden_size: int = 64,
+            ctx_len: int = 25,
             **kwargs: Any,
     ) -> None:
         """
@@ -91,13 +92,17 @@ class PPO2(LightningModule):
         self.max_episode_len = max_episode_len
         self.clip_ratio = clip_ratio
         self.hidden_size = hidden_size
-        self.ctx_len = 25
+        self.ctx_len = ctx_len
         self.save_hyperparameters()
 
         self.env = gym.make(env)
 
         # common base network
-        self.common_net = CommonTransformer(self.env.observation_space.shape, self.hidden_size, ctx_len=self.ctx_len)
+        self.common_net = CommonTransformer(self.env.observation_space.shape[0],
+                                            self.env.action_space.n,
+                                            max_episode_len=max_episode_len,
+                                            out_features=self.hidden_size,
+                                            ctx_len=self.ctx_len)
 
         # value network
         self.critic = MLP((self.hidden_size,), 1)
@@ -133,7 +138,7 @@ class PPO2(LightningModule):
 
         # the inputs to the model are a sequence of shape (timesteps, input_dim)
         # create a float tensor of size (timesteps, input_dim)
-        self.timesteps = torch.zeros(self.ctx_len, 1, dtype=torch.int32)
+        self.timesteps = torch.ones(self.ctx_len, 1, dtype=torch.int32) * -1
         self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape)
         # add the first state to the state of time timesteps
         self.states[-1] = torch.from_numpy(self.env.reset())
@@ -203,20 +208,20 @@ class PPO2(LightningModule):
         """
 
         # store the last 5 states starting with zeros for all time steps
-
+        timestep = 0
         for step in range(self.steps_per_epoch):
             self.timesteps = self.timesteps.to(device=self.device)
             self.states = self.states.to(device=self.device)
             self.actions = self.actions.to(device=self.device)
             self.timesteps = torch.cat((self.timesteps[1:],
-                                        torch.tensor([step]).unsqueeze(0).to(device=self.device)))
+                                        torch.tensor([timestep]).unsqueeze(0).to(device=self.device)))
 
             with torch.no_grad():
                 pi, action, value = self((self.timesteps, self.states, self.actions))
                 log_prob = self.actor.get_log_prob(pi, action)
 
-            self.actions = torch.cat((self.actions[1:], torch.Tensor(action).unsqueeze(0).to(device=self.device)))
-            next_state, reward, done, _ = self.env.step(action.cpu().numpy()[0])
+            self.actions = torch.cat((self.actions[1:], torch.Tensor([action]).unsqueeze(0).to(device=self.device)))
+            next_state, reward, done, _ = self.env.step(action.cpu().numpy())
 
             self.episode_step += 1
 
@@ -259,7 +264,8 @@ class PPO2(LightningModule):
                 self.ep_values = []
                 self.episode_step = 0
 
-                self.timesteps = torch.zeros(self.ctx_len, 1, dtype=torch.int32)
+                timestep = 0
+                self.timesteps = torch.ones(self.ctx_len, 1, dtype=torch.int32) * -1
                 self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape)
                 # add the first state to the state of time timesteps
                 self.states[-1] = torch.from_numpy(self.env.reset())
@@ -295,6 +301,8 @@ class PPO2(LightningModule):
 
                 self.epoch_rewards.clear()
 
+            timestep += 1
+
     def actor_loss(self, nn_inputs, action, logp_old, adv) -> Tensor:
         x = self.common_net(nn_inputs)
         pi, _ = self.actor(x)
@@ -322,8 +330,6 @@ class PPO2(LightningModule):
             loss
         """
         nn_inputs, action, old_logp, qval, adv = batch
-
-        print("training_step:", )
 
         # normalize advantages
         adv = (adv - adv.mean()) / adv.std()
