@@ -213,20 +213,30 @@ class PPO2(LightningModule):
             self.timesteps = self.timesteps.to(device=self.device)
             self.states = self.states.to(device=self.device)
             self.actions = self.actions.to(device=self.device)
+
             self.timesteps = torch.cat((self.timesteps[1:],
                                         torch.tensor([timestep]).unsqueeze(0).to(device=self.device)))
 
             with torch.no_grad():
                 pi, action, value = self((self.timesteps, self.states, self.actions))
                 log_prob = self.actor.get_log_prob(pi, action)
+                ###############################################################################
+                # PPO1:
+                # pi: Categorical(probs: torch.Size([4]), logits: torch.Size([4]))
+                # action: torch.Size([])
+                # value: torch.Size([1])
+                # log_prob: torch.Size([])
+                ###############################################################################
 
             action_oh = torch.nn.functional.one_hot(action, num_classes=self.env.action_space.n)
-            # print(f"action: {action}")
-            # print(f"action_oh: {action_oh}")
-            # print(f"action_oh: {action_oh.shape}")
 
             self.actions = torch.cat((self.actions[1:], torch.Tensor(action_oh).unsqueeze(0).to(device=self.device)))
-            next_state, reward, done, _ = self.env.step(action.cpu().numpy())
+            action_for_step = action.cpu().numpy()
+            ###############################################################################
+            # PPO1:
+            # action_for_step.shape: ()
+            ###############################################################################
+            next_state, reward, done, _ = self.env.step(action_for_step)
 
             self.episode_step += 1
 
@@ -312,6 +322,12 @@ class PPO2(LightningModule):
         x = self.common_net(nn_inputs)
         pi, _ = self.actor(x)
         logp = self.actor.get_log_prob(pi, action)
+        ###############################################################################
+        # PPO1:
+        # x: torch.Size([512, 64])
+        # pi: Categorical(probs: torch.Size([512, 4]), logits: torch.Size([512, 4]))
+        # logp: torch.Size([512])
+        ###############################################################################
         ratio = torch.exp(logp - logp_old)
         clip_adv = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * adv
         loss_actor = -(torch.min(ratio * adv, clip_adv)).mean()
@@ -320,6 +336,11 @@ class PPO2(LightningModule):
     def critic_loss(self, nn_inputs, qval) -> Tensor:
         x = self.common_net(nn_inputs)
         value = self.critic(x)
+        ###############################################################################
+        # PPO1:
+        # x: torch.Size([512, 64])
+        # value: torch.Size([512, 1])
+        ###############################################################################
         loss_critic = (qval - value).pow(2).mean()
         return loss_critic
 
@@ -335,6 +356,14 @@ class PPO2(LightningModule):
             loss
         """
         nn_inputs, action, old_logp, qval, adv = batch
+        ###############################################################################
+        # PPO1:
+        # state: torch.Size([512, 8])
+        # action: torch.Size([512])
+        # old_logp: torch.Size([512])
+        # qval: torch.Size([512])
+        # adv: torch.Size([512])
+        ###############################################################################
 
         # normalize advantages
         adv = (adv - adv.mean()) / adv.std()

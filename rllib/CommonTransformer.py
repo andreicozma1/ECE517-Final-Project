@@ -143,11 +143,10 @@ class CommonTransformer(nn.Module):
         # TODO: Was initially here
         # x = x.squeeze()
 
-        # print(x.shape)
-        # print(x.shape)
-        # [5, 1, 64]
-        # [1, 64]
-        # [64] <--- correct
+        ###############################################################################
+        # PPO1:
+        # x: torch.Size([64]) <--- correct
+        ###############################################################################
         return x
 
     @staticmethod

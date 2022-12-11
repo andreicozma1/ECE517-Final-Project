@@ -192,15 +192,24 @@ class PPO1(LightningModule):
         Yield:
            Tuple of Lists containing tensors for states, actions, log probs, qvals and advantage
         """
-
+        print("=" * 80)
+        print("Generating trajectory samples...")
         for step in range(self.steps_per_epoch):
             self.state = self.state.to(device=self.device)
+
+            print("state:", self.state.shape)
 
             with torch.no_grad():
                 pi, action, value = self(self.state)
                 log_prob = self.actor.get_log_prob(pi, action)
+                print("pi:", pi)
+                print("action:", action.shape)
+                print("value:", value.shape)
+                print("log_prob:", log_prob.shape)
 
-            next_state, reward, done, _ = self.env.step(action.cpu().numpy())
+            action_for_step = action.cpu().numpy()
+            print("action_for_step:", action_for_step.shape)
+            next_state, reward, done, _ = self.env.step(action_for_step)
 
             self.episode_step += 1
 
@@ -271,9 +280,13 @@ class PPO1(LightningModule):
                 self.epoch_rewards.clear()
 
     def actor_loss(self, state, action, logp_old, adv) -> Tensor:
+        print("-" * 60)
         x = self.common_net(state)
         pi, _ = self.actor(x)
         logp = self.actor.get_log_prob(pi, action)
+        print("x:", x.shape)
+        print("pi:", pi)
+        print("logp:", logp.shape)
         ratio = torch.exp(logp - logp_old)
         clip_adv = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * adv
         loss_actor = -(torch.min(ratio * adv, clip_adv)).mean()
@@ -282,6 +295,9 @@ class PPO1(LightningModule):
     def critic_loss(self, state, qval) -> Tensor:
         x = self.common_net(state)
         value = self.critic(x)
+        print("-" * 60)
+        print("x:", x.shape)
+        print("value:", value.shape)
         loss_critic = (qval - value).pow(2).mean()
         return loss_critic
 
@@ -296,7 +312,14 @@ class PPO1(LightningModule):
         Returns:
             loss
         """
+        print("=" * 80)
+        print("Training step...")
         state, action, old_logp, qval, adv = batch
+        print("state:", state.shape)
+        print("action:", action.shape)
+        print("old_logp:", old_logp.shape)
+        print("qval:", qval.shape)
+        print("adv:", adv.shape)
 
         # normalize advantages
         adv = (adv - adv.mean()) / adv.std()
