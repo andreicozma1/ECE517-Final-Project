@@ -1,6 +1,6 @@
 import argparse
 
-from rllib.Utils import Model
+from rllib.Model import Model
 
 
 def main():

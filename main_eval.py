@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
-from rllib.Utils import Model
+from rllib.Model import Model
 
 
 def main():
