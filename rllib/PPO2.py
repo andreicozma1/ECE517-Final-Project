@@ -142,7 +142,7 @@ class PPO2(LightningModule):
         self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape)
         # add the first state to the state of time timesteps
         self.states[-1] = torch.from_numpy(self.env.reset())
-        self.actions = torch.zeros(self.ctx_len, 1)
+        self.actions = torch.zeros(self.ctx_len, self.env.action_space.n)
 
     def forward(self, x) -> Tuple[Tensor, Tensor, Tensor]:
         """Passes in a state x through the network and returns the policy and a sampled action.
@@ -220,7 +220,12 @@ class PPO2(LightningModule):
                 pi, action, value = self((self.timesteps, self.states, self.actions))
                 log_prob = self.actor.get_log_prob(pi, action)
 
-            self.actions = torch.cat((self.actions[1:], torch.Tensor([action]).unsqueeze(0).to(device=self.device)))
+            action_oh = torch.nn.functional.one_hot(action, num_classes=self.env.action_space.n)
+            # print(f"action: {action}")
+            # print(f"action_oh: {action_oh}")
+            # print(f"action_oh: {action_oh.shape}")
+
+            self.actions = torch.cat((self.actions[1:], torch.Tensor(action_oh).unsqueeze(0).to(device=self.device)))
             next_state, reward, done, _ = self.env.step(action.cpu().numpy())
 
             self.episode_step += 1
@@ -269,7 +274,7 @@ class PPO2(LightningModule):
                 self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape)
                 # add the first state to the state of time timesteps
                 self.states[-1] = torch.from_numpy(self.env.reset())
-                self.actions = torch.zeros(self.ctx_len, 1)
+                self.actions = torch.zeros(self.ctx_len, self.env.action_space.n)
 
             if epoch_end:
                 train_data = zip(
