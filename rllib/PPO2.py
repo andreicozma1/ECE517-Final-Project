@@ -102,7 +102,7 @@ class PPO2(LightningModule):
                                             self.env.action_space.n,
                                             max_episode_len=max_episode_len,
                                             out_features=self.hidden_size,
-                                            ctx_len=self.ctx_len)
+                                            seq_len=self.ctx_len)
 
         # value network
         self.critic = MLP((self.hidden_size,), 1)
@@ -218,8 +218,6 @@ class PPO2(LightningModule):
                                         torch.tensor([timestep]).unsqueeze(0).to(device=self.device)))
 
             with torch.no_grad():
-                pi, action, value = self((self.timesteps, self.states, self.actions))
-                log_prob = self.actor.get_log_prob(pi, action)
                 ###############################################################################
                 # PPO1:
                 # pi: Categorical(probs: torch.Size([4]), logits: torch.Size([4]))
@@ -227,15 +225,19 @@ class PPO2(LightningModule):
                 # value: torch.Size([1])
                 # log_prob: torch.Size([])
                 ###############################################################################
+                pi, action, value = self((self.timesteps, self.states, self.actions))
+                log_prob = self.actor.get_log_prob(pi, action)
 
-            action_oh = torch.nn.functional.one_hot(action, num_classes=self.env.action_space.n)
+            action_one_hot = torch.zeros(pi.probs.shape)
+            action_one_hot[action] = 1
+            self.actions = torch.cat((self.actions[1:],
+                                      torch.Tensor(action_one_hot).unsqueeze(0).to(device=self.device)))
 
-            self.actions = torch.cat((self.actions[1:], torch.Tensor(action_oh).unsqueeze(0).to(device=self.device)))
-            action_for_step = action.cpu().numpy()
             ###############################################################################
             # PPO1:
             # action_for_step.shape: ()
             ###############################################################################
+            action_for_step = action.cpu().numpy()
             next_state, reward, done, _ = self.env.step(action_for_step)
 
             self.episode_step += 1
@@ -319,28 +321,29 @@ class PPO2(LightningModule):
             timestep += 1
 
     def actor_loss(self, nn_inputs, action, logp_old, adv) -> Tensor:
-        x = self.common_net(nn_inputs)
-        pi, _ = self.actor(x)
-        logp = self.actor.get_log_prob(pi, action)
         ###############################################################################
         # PPO1:
         # x: torch.Size([512, 64])
         # pi: Categorical(probs: torch.Size([512, 4]), logits: torch.Size([512, 4]))
         # logp: torch.Size([512])
         ###############################################################################
+        x = self.common_net(nn_inputs)
+        pi, _ = self.actor(x)
+        logp = self.actor.get_log_prob(pi, action)
         ratio = torch.exp(logp - logp_old)
         clip_adv = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * adv
         loss_actor = -(torch.min(ratio * adv, clip_adv)).mean()
         return loss_actor
 
     def critic_loss(self, nn_inputs, qval) -> Tensor:
-        x = self.common_net(nn_inputs)
-        value = self.critic(x)
         ###############################################################################
         # PPO1:
         # x: torch.Size([512, 64])
         # value: torch.Size([512, 1])
         ###############################################################################
+        x = self.common_net(nn_inputs)
+        value = self.critic(x)
+
         loss_critic = (qval - value).pow(2).mean()
         return loss_critic
 
@@ -364,6 +367,11 @@ class PPO2(LightningModule):
         # qval: torch.Size([512])
         # adv: torch.Size([512])
         ###############################################################################
+        expected_shape = torch.Size([self.batch_size])
+        assert action.shape == expected_shape
+        assert old_logp.shape == expected_shape
+        assert qval.shape == expected_shape
+        assert adv.shape == expected_shape
 
         # normalize advantages
         adv = (adv - adv.mean()) / adv.std()

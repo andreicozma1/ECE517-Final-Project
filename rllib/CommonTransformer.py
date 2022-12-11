@@ -11,7 +11,7 @@ class CommonTransformer(nn.Module):
 
     def __init__(self, n_states: int, n_actions: int,
                  max_episode_len: int, out_features: int,
-                 ctx_len: int, hidden_size: int = 128):
+                 seq_len: int, hidden_size: int = 128):
         """
         Args:
             n_states: observation shape of the environment
@@ -21,24 +21,30 @@ class CommonTransformer(nn.Module):
         super().__init__()
         self.n_states = n_states
         self.n_actions = n_actions
-        self.seq_len = ctx_len
+        self.out_features = out_features
+        self.seq_len = seq_len
         self.hidden_size = hidden_size
-        self.pos_emb = nn.Embedding(max_episode_len + 1, hidden_size)
-        self.state_emb = nn.Linear(n_states, hidden_size)
-        self.action_emb = nn.Linear(n_actions, hidden_size)
 
-        # self.pos_emb = nn.Embedding(self.seq_len, 128)
+        self.emb_pos = nn.Embedding(max_episode_len + 1, hidden_size)
+        self.emb_states = nn.Linear(n_states, hidden_size)
+        self.emb_action = nn.Linear(n_actions, hidden_size)
+
         self.transformer_encoder = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=4, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder, num_layers=2)
         self.pool = nn.AvgPool1d(self.seq_len)  # [5,128] -> [5,1]
         # self.pool = nn.AvgPool1d(2 * self.seq_len)  # [5,128] -> [5,1]
-        self.linear = nn.Linear(hidden_size, out_features)
-        self.relu = nn.ReLU()
-        # state and position embedding
-        # the state embedding is float, the position embedding is int
+
+        self.out = nn.Sequential(
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, out_features),
+        )
 
     def forward(self, input_x):
         positions, states, actions = input_x
+        # print("positions:", positions)
+        # print("states:", states)
+        # print("actions:", actions)
         positions = torch.squeeze(positions, dim=-1)
 
         # print("=" * 80)
@@ -50,11 +56,11 @@ class CommonTransformer(nn.Module):
         # print(actions.shape)
 
         padding_mask_pos = torch.where(positions == -1, 1, 0).bool()  # shape: [25]
-        positions_no_neg = torch.where(positions == -1, torch.zeros_like(positions), positions)
-        position_embedding = self.pos_emb(positions_no_neg)
+        positions = torch.where(positions == -1, torch.zeros_like(positions), positions)
+        position_embedding = self.emb_pos(positions)
 
-        state_emb = self.state_emb(states)
-        action_emb = self.action_emb(actions)
+        state_emb = self.emb_states(states)
+        action_emb = self.emb_action(actions)
 
         # TODO: add padding_idx to pos_emb call
 
@@ -123,7 +129,9 @@ class CommonTransformer(nn.Module):
         #     corresponding position is not allowed to attend. For a float mask, the mask values will be added to
         #     the attention weight.
 
-        x = self.transformer_encoder(state_emb)
+        trans_imp = state_emb
+
+        trans_out = self.transformer_encoder(trans_imp)
         # x = self.transformer_encoder(stacked_inputs, src_key_padding_mask=stacked_attention_mask)
 
         # print('-------------------')
@@ -131,23 +139,18 @@ class CommonTransformer(nn.Module):
         # print(x.shape)
         # x = x[1]
         # print(x.shape)
-        if x.dim() == 2:
-            x = self.pool(x.permute(1, 0)).permute(1, 0)
-        elif x.dim() == 3:
-            x = self.pool(x.permute(0, 2, 1)).permute(0, 2, 1)
-        # print(x.shape)
-
-        x = x.squeeze()
-        x = self.linear(x)
-        x = self.relu(x)
-        # TODO: Was initially here
-        # x = x.squeeze()
+        if trans_out.dim() == 2:
+            trans_out = self.pool(trans_out.permute(1, 0)).permute(1, 0)
+        elif trans_out.dim() == 3:
+            trans_out = self.pool(trans_out.permute(0, 2, 1)).permute(0, 2, 1)
 
         ###############################################################################
         # PPO1:
-        # x: torch.Size([64]) <--- correct
+        # out: torch.Size([64]) <--- correct
         ###############################################################################
-        return x
+        out_imp = trans_out.squeeze()
+        out = self.out(out_imp)
+        return out
 
     @staticmethod
     def generate_square_subsequent_mask(sz: int) -> Tensor:
