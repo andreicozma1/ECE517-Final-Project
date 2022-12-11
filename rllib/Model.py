@@ -1,5 +1,6 @@
 import hashlib
 import os
+import pprint
 import sys
 import time
 
@@ -8,6 +9,7 @@ import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
+from rllib.PPO2 import PPO2
 from rllib.PPO1 import PPO1
 from rllib.Utils import discount_rewards
 from rllib.examples.A2CExample import AdvantageActorCritic
@@ -27,9 +29,10 @@ class Model:
         model_params = model_params or {}
         # setup model
         models = {
-                "ppo_ex": PPO(env, *model_params),
-                "a2c_ex": AdvantageActorCritic(env, *model_params),
-                "ppo_1" : PPO1(env, *model_params),
+                "ppo_ex": PPO,
+                "a2c_ex": AdvantageActorCritic,
+                "ppo_1" : PPO1,
+                "ppo_2" : PPO2,
         }
         if model_name not in models:
             print(f"ERROR: Model {model_name} not supported")
@@ -38,9 +41,10 @@ class Model:
                 print(f" - {model}")
             sys.exit(1)
         self.name = model_name
-        self.model = models[self.name]
+        self.model = models[self.name](env, *model_params)
         self.model_hash = str(hashlib.md5(str(self.model).encode('utf-8')).hexdigest())
         self.model_save_dir = os.path.join(checkpoint_dir, self.name, env)
+        print(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def load_model(self, checkpoint_path, model_params=None):
         model_params = model_params or {}
@@ -48,6 +52,7 @@ class Model:
         model_name, env = model_path_split[-3], model_path_split[-2]
         self.create_model(env, model_name, model_params)
         self.model.load_state_dict(torch.load(checkpoint_path))
+        print(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def train(self, num_epochs, val_check_interval=None):
         trainer = Trainer(
@@ -57,9 +62,9 @@ class Model:
                 val_check_interval=val_check_interval,
                 logger=self.loggers,
                 enable_checkpointing=True,
-                auto_lr_find=True,
-                auto_scale_batch_size=True,
-                precision=16,
+                # auto_lr_find=True,
+                # auto_scale_batch_size=True,
+                precision=32,
         )
         if self.model is None:
             raise ValueError("ERROR: Model hasn't been created/loaded")

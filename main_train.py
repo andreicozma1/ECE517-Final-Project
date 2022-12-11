@@ -1,6 +1,9 @@
 import argparse
+import os
 
 from rllib.Model import Model
+
+os.environ['WANDB_SILENT'] = "true"
 
 
 def main():
@@ -23,7 +26,7 @@ def parse_args():
     parser.add_argument("-m", "--model_name", type=str, default="ppo_ex")
     parser.add_argument("-nm", "--num_models", type=int, default=5)
     parser.add_argument("-ne", "--num_epochs", type=int, default=150)
-    parser.add_argument("--val_check_interval", type=int, default=25)
+    parser.add_argument("--val_check_interval", type=int, default=5)
     parser.add_argument("--wandb_project", type=str, default="rl_project")
     return parser.parse_args()
 

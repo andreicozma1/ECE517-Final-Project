@@ -6,7 +6,7 @@ from torch import nn
 class CommonBase(nn.Module):
     """Simple MLP network."""
 
-    def __init__(self, input_shape: Tuple[int], n_actions: int, hidden_size: int = 128):
+    def __init__(self, input_shape: Tuple[int], hidden_size: int = 128):
         """
         Args:
             input_shape: observation shape of the environment
@@ -17,7 +17,7 @@ class CommonBase(nn.Module):
         self.net = nn.Sequential(
                 nn.Linear(input_shape[0], hidden_size),
                 nn.ReLU(),
-                nn.Linear(hidden_size, n_actions),
+                nn.Linear(hidden_size, hidden_size),
         )
 
     def forward(self, input_x):
