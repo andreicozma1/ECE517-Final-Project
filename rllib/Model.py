@@ -59,9 +59,7 @@ class Model:
                 enable_checkpointing=True,
                 auto_lr_find=True,
                 auto_scale_batch_size=True,
-                enable_model_summary=True,
                 precision=16,
-                # callbacks=callbacks
         )
         if self.model is None:
             raise ValueError("ERROR: Model hasn't been created/loaded")
