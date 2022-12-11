@@ -6,18 +6,18 @@ from torch import nn
 class CommonBase(nn.Module):
     """Simple MLP network."""
 
-    def __init__(self, input_shape: Tuple[int], hidden_size: int = 128):
+    def __init__(self, in_features: int, out_features: int):
         """
         Args:
-            input_shape: observation shape of the environment
+            in_features: observation shape of the environment
             n_actions: number of discrete actions available in the environment
-            hidden_size: size of hidden layers
+            out_features: size of hidden layers
         """
         super().__init__()
         self.net = nn.Sequential(
-                nn.Linear(input_shape[0], hidden_size),
+                nn.Linear(in_features, out_features),
                 nn.ReLU(),
-                nn.Linear(hidden_size, hidden_size),
+                nn.Linear(out_features, out_features),
         )
 
     def forward(self, input_x):
@@ -30,7 +30,5 @@ class CommonBase(nn.Module):
             output of network
         """
         inp = input_x.float()
-        print("inp:", inp.shape)
         out = self.net(inp)
-        print("out:", out.shape)
         return out

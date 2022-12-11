@@ -2,8 +2,10 @@
 Taken from https://github.com/Lightning-AI/lightning-bolts/blob/master/pl_bolts/models/rl/ppo_model.py
 """
 import argparse
+import os
 from typing import Any, List, Tuple
 
+import numpy as np
 import torch
 from pytorch_lightning import LightningModule, Trainer, seed_everything
 from torch import Tensor
@@ -16,12 +18,15 @@ from pl_bolts.utils import _GYM_AVAILABLE
 from pl_bolts.utils.stability import under_review
 from pl_bolts.utils.warnings import warn_missing_pkg
 
+from rllib.CommonBase import CommonBase
 from rllib.CommonTransformer import CommonTransformer
 
 if _GYM_AVAILABLE:
     import gym
 else:  # pragma: no cover
     warn_missing_pkg("gym")
+
+os.environ['WANDB_SILENT'] = "true"
 
 
 class PPO2(LightningModule):
@@ -52,15 +57,15 @@ class PPO2(LightningModule):
             env: str,
             gamma: float = 0.99,
             lam: float = 0.95,
-            lr_actor: float = 3e-4,
-            lr_critic: float = 1e-3,
+            lr_actor: float = 0.0003,
+            lr_critic: float = 0.001,
             max_episode_len: int = 200,
-            batch_size: int = 512,
+            batch_size: int = 1024,
             steps_per_epoch: int = 2048,
             nb_optim_iters: int = 5,
             clip_ratio: float = 0.2,
             hidden_size: int = 64,
-            ctx_len: int = 25,
+            ctx_len: int = 10,
             **kwargs: Any,
     ) -> None:
         """
@@ -98,11 +103,14 @@ class PPO2(LightningModule):
         self.env = gym.make(env)
 
         # common base network
-        self.common_net = CommonTransformer(self.env.observation_space.shape[0],
-                                            self.env.action_space.n,
-                                            max_episode_len=max_episode_len,
-                                            out_features=self.hidden_size,
-                                            seq_len=self.ctx_len)
+        self.common_net_1 = CommonTransformer(self.env.observation_space.shape[0],
+                                              self.env.action_space.n,
+                                              max_episode_len=max_episode_len,
+                                              out_features=self.hidden_size,
+                                              batch_size=self.batch_size,
+                                              seq_len=self.ctx_len
+                                              )
+        self.common_net_2 = CommonBase(self.env.observation_space.shape[0], self.hidden_size)
 
         # value network
         self.critic = MLP((self.hidden_size,), 1)
@@ -136,29 +144,230 @@ class PPO2(LightningModule):
         self.avg_ep_len = 0
         self.avg_reward = 0
 
-        # the inputs to the model are a sequence of shape (timesteps, input_dim)
-        # create a float tensor of size (timesteps, input_dim)
-        self.timesteps = torch.ones(self.ctx_len, 1, dtype=torch.int32) * -1
-        self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape)
+        self.timesteps = None
+        self.states = None
+        self.actions = None
+        self.reset_all()
+
+    def reset_all(self):
+        self.timesteps = torch.ones(self.ctx_len, dtype=torch.int32) * -1
+        self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32)
         # add the first state to the state of time timesteps
         self.states[-1] = torch.from_numpy(self.env.reset())
-        self.actions = torch.zeros(self.ctx_len, self.env.action_space.n)
+        self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32)
 
-    def forward(self, x) -> Tuple[Tensor, Tensor, Tensor]:
-        """Passes in a state x through the network and returns the policy and a sampled action.
+    def forward(self, nn_inputs) -> Tuple[Tensor, Tensor, Tensor]:
+        pi, action = self.forward_actor(nn_inputs)
+        value = self.forward_critic(nn_inputs, batched=False)
+        return pi, action, value
+
+    def forward_actor(self, nn_inputs):
+        _, states, _ = nn_inputs
+        # x = self.common_net_1(nn_inputs, batched=True)
+        states = states.reshape(-1, self.ctx_len, *self.env.observation_space.shape)
+        states = states[:, -1, :].squeeze()
+        comm2 = self.common_net_2(states)
+        pi, action = self.actor(comm2)
+        return pi, action
+
+    def forward_critic(self, nn_inputs, batched):
+        comm1 = self.common_net_1(nn_inputs, batched=batched)
+        value = self.critic(comm1)
+        return value
+
+    def add_state(self, next_state):
+        next_state = torch.from_numpy(next_state).to(self.device)
+        next_state = torch.reshape(next_state, (1, -1))
+        self.states = torch.cat((self.states[1:], next_state))
+
+    def add_action(self, pi, action):
+        action_one_hot = torch.zeros(pi.probs.shape).to(self.device)
+        action_one_hot[action] = 1
+        action_one_hot = torch.reshape(action_one_hot, (1, -1))
+        self.actions = torch.cat((self.actions[1:], action_one_hot))
+
+    def add_step(self):
+        ep_step = torch.Tensor([self.episode_step]).to(self.device)
+        ep_step = ep_step.int()
+        self.timesteps = torch.cat((self.timesteps[1:], ep_step))
+
+    def generate_trajectory_samples(self) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
+        """Contains the logic for generating trajectory data to train policy and value network.
+
+        Yield:
+           Tuple of Lists containing tensors for states, actions, log probs, qvals and advantage
+        """
+
+        for step in range(self.steps_per_epoch):
+            self.timesteps = self.timesteps.to(self.device)
+            self.states = self.states.to(self.device)
+            self.actions = self.actions.to(self.device)
+
+            self.add_step()
+
+            with torch.no_grad():
+                ###############################################################################
+                # PPO1:
+                # pi: Categorical(probs: torch.Size([4]), logits: torch.Size([4]))
+                # action: torch.Size([])
+                # value: torch.Size([1])
+                # log_prob: torch.Size([])
+                ###############################################################################
+
+                pi, action, value = self((self.timesteps, self.states, self.actions))
+                log_prob = self.actor.get_log_prob(pi, action)
+
+            self.add_action(pi, action)
+
+            ###############################################################################
+            # PPO1:
+            # action_for_step.shape: ()
+            ###############################################################################
+            action_for_step = action.cpu().numpy()
+            next_state, reward, done, _ = self.env.step(action_for_step)
+
+            self.episode_step += 1
+
+            self.batch_nn_inputs.append((self.timesteps, self.states, self.actions))
+            self.batch_actions.append(action)
+            self.batch_logp.append(log_prob)
+
+            self.ep_rewards.append(reward)
+            self.ep_values.append(value.item())
+
+            self.add_state(next_state)
+
+            epoch_end = step == (self.steps_per_epoch - 1)
+            terminal = len(self.ep_rewards) == self.max_episode_len
+
+            if epoch_end or done or terminal:
+                # if trajectory ends abtruptly, boostrap value of next state
+                if (terminal or epoch_end) and not done:
+                    # self.states = self.states.to(device=self.device)
+                    with torch.no_grad():
+                        _, _, value = self((self.timesteps, self.states, self.actions))
+                        last_value = value.item()
+                        steps_before_cutoff = self.episode_step
+                else:
+                    last_value = 0
+                    steps_before_cutoff = 0
+
+                # discounted cumulative reward
+                self.batch_qvals += self.discount_rewards(self.ep_rewards + [last_value], self.gamma)[:-1]
+                # advantage
+                self.batch_adv += self.calc_advantage(self.ep_rewards, self.ep_values, last_value)
+                # logs
+                self.epoch_rewards.append(sum(self.ep_rewards))
+                # reset params
+                self.ep_rewards = []
+                self.ep_values = []
+                self.episode_step = 0
+
+                self.reset_all()
+
+            if epoch_end:
+                train_data = zip(
+                        self.batch_nn_inputs, self.batch_actions, self.batch_logp, self.batch_qvals, self.batch_adv
+                )
+
+                for nn_input, action, logp_old, qval, adv in train_data:
+                    yield nn_input, action, logp_old, qval, adv
+
+                self.batch_nn_inputs.clear()
+                self.batch_actions.clear()
+                self.batch_adv.clear()
+                self.batch_logp.clear()
+                self.batch_qvals.clear()
+
+                # logging
+                self.avg_reward = sum(self.epoch_rewards) / self.steps_per_epoch
+
+                # if epoch ended abruptly, exlude last cut-short episode to prevent stats skewness
+                epoch_rewards = self.epoch_rewards
+                if not done:
+                    epoch_rewards = epoch_rewards[:-1]
+
+                total_epoch_reward = sum(epoch_rewards)
+                nb_episodes = len(epoch_rewards)
+
+                self.avg_ep_reward = total_epoch_reward / nb_episodes
+                self.avg_ep_len = (self.steps_per_epoch - steps_before_cutoff) / nb_episodes
+
+                self.epoch_rewards.clear()
+
+    def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx, optimizer_idx):
+        """Carries out a single update to actor and critic network from a batch of replay buffer.
 
         Args:
-            x: environment state
+            batch: batch of replay buffer/trajectory data
+            batch_idx: not used
+            optimizer_idx: idx that controls optimizing actor or critic network
 
         Returns:
-            Tuple of policy and action
+            loss
         """
-        # print("=" * 80)
-        comm = self.common_net(x)
-        pi, action = self.actor(comm)
-        value = self.critic(comm)
+        nn_inputs, action, old_logp, qval, adv = batch
+        ###############################################################################
+        # PPO1:
+        # state: torch.Size([512, 8])
+        # action: torch.Size([512])
+        # old_logp: torch.Size([512])
+        # qval: torch.Size([512])
+        # adv: torch.Size([512])
+        ###############################################################################
+        expected_shape = torch.Size([self.batch_size])
+        assert action.shape == expected_shape, f"action shape {action.shape} != {expected_shape}"
+        assert old_logp.shape == expected_shape, f"old_logp shape {old_logp.shape} != {expected_shape}"
+        assert qval.shape == expected_shape, f"qval shape {qval.shape} != {expected_shape}"
+        assert adv.shape == expected_shape, f"adv shape {adv.shape} != {expected_shape}"
 
-        return pi, action, value
+        # normalize advantages
+        adv = (adv - adv.mean()) / adv.std()
+
+        self.log("avg_ep_len", self.avg_ep_len, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("avg_ep_reward", self.avg_ep_reward, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("avg_reward", self.avg_reward, prog_bar=True, on_step=False, on_epoch=True)
+
+        if optimizer_idx == 0:
+            loss_actor = self.actor_loss(nn_inputs, action, old_logp, adv)
+            self.log("loss_actor", loss_actor, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+
+            return loss_actor
+
+        if optimizer_idx == 1:
+            loss_critic = self.critic_loss(nn_inputs, qval)
+            self.log("loss_critic", loss_critic, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+
+            return loss_critic
+
+        raise NotImplementedError(
+                f"Got optimizer_idx: {optimizer_idx}. Expected only 2 optimizers from configure_optimizers. "
+                "Modify optimizer logic in training_step to account for this. "
+        )
+
+    def actor_loss(self, nn_inputs, action, logp_old, adv) -> Tensor:
+        ###############################################################################
+        # PPO1:
+        # x: torch.Size([512, 64])
+        # pi: Categorical(probs: torch.Size([512, 4]), logits: torch.Size([512, 4]))
+        # logp: torch.Size([512])
+        ###############################################################################
+        pi, _ = self.forward_actor(nn_inputs)
+        logp = self.actor.get_log_prob(pi, action)
+        ratio = torch.exp(logp - logp_old)
+        clip_adv = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * adv
+        loss_actor = -(torch.min(ratio * adv, clip_adv)).mean()
+        return loss_actor
+
+    def critic_loss(self, nn_inputs, qval) -> Tensor:
+        ###############################################################################
+        # PPO1:
+        # x: torch.Size([512, 64])
+        # value: torch.Size([512, 1])
+        ###############################################################################
+        value = self.forward_critic(nn_inputs, batched=True)
+        loss_critic = (qval - value).pow(2).mean()
+        return loss_critic
 
     def discount_rewards(self, rewards: List[float], discount: float) -> List[float]:
         """Calculate the discounted rewards of all rewards in list.
@@ -199,203 +408,6 @@ class PPO2(LightningModule):
         adv = self.discount_rewards(delta, self.gamma * self.lam)
 
         return adv
-
-    def generate_trajectory_samples(self) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
-        """Contains the logic for generating trajectory data to train policy and value network.
-
-        Yield:
-           Tuple of Lists containing tensors for states, actions, log probs, qvals and advantage
-        """
-
-        # store the last 5 states starting with zeros for all time steps
-        timestep = 0
-        for step in range(self.steps_per_epoch):
-            self.timesteps = self.timesteps.to(device=self.device)
-            self.states = self.states.to(device=self.device)
-            self.actions = self.actions.to(device=self.device)
-
-            self.timesteps = torch.cat((self.timesteps[1:],
-                                        torch.tensor([timestep]).unsqueeze(0).to(device=self.device)))
-
-            with torch.no_grad():
-                ###############################################################################
-                # PPO1:
-                # pi: Categorical(probs: torch.Size([4]), logits: torch.Size([4]))
-                # action: torch.Size([])
-                # value: torch.Size([1])
-                # log_prob: torch.Size([])
-                ###############################################################################
-                pi, action, value = self((self.timesteps, self.states, self.actions))
-                log_prob = self.actor.get_log_prob(pi, action)
-
-            action_one_hot = torch.zeros(pi.probs.shape)
-            action_one_hot[action] = 1
-            self.actions = torch.cat((self.actions[1:],
-                                      torch.Tensor(action_one_hot).unsqueeze(0).to(device=self.device)))
-
-            ###############################################################################
-            # PPO1:
-            # action_for_step.shape: ()
-            ###############################################################################
-            action_for_step = action.cpu().numpy()
-            next_state, reward, done, _ = self.env.step(action_for_step)
-
-            self.episode_step += 1
-
-            self.batch_nn_inputs.append((self.timesteps, self.states, self.actions))
-            self.batch_actions.append(action)
-            self.batch_logp.append(log_prob)
-
-            self.ep_rewards.append(reward)
-            self.ep_values.append(value.item())
-
-            # add the next state to the state of time timesteps
-            self.states = torch.cat((self.states[1:], torch.from_numpy(next_state).unsqueeze(0).to(device=self.device)),
-                                    dim=0)
-
-            # self.state = torch.FloatTensor(next_state)
-
-            epoch_end = step == (self.steps_per_epoch - 1)
-            terminal = len(self.ep_rewards) == self.max_episode_len
-
-            if epoch_end or done or terminal:
-                # if trajectory ends abtruptly, boostrap value of next state
-                if (terminal or epoch_end) and not done:
-                    self.states = self.states.to(device=self.device)
-                    with torch.no_grad():
-                        _, _, value = self((self.timesteps, self.states, self.actions))
-                        last_value = value.item()
-                        steps_before_cutoff = self.episode_step
-                else:
-                    last_value = 0
-                    steps_before_cutoff = 0
-
-                # discounted cumulative reward
-                self.batch_qvals += self.discount_rewards(self.ep_rewards + [last_value], self.gamma)[:-1]
-                # advantage
-                self.batch_adv += self.calc_advantage(self.ep_rewards, self.ep_values, last_value)
-                # logs
-                self.epoch_rewards.append(sum(self.ep_rewards))
-                # reset params
-                self.ep_rewards = []
-                self.ep_values = []
-                self.episode_step = 0
-
-                timestep = 0
-                self.timesteps = torch.ones(self.ctx_len, 1, dtype=torch.int32) * -1
-                self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape)
-                # add the first state to the state of time timesteps
-                self.states[-1] = torch.from_numpy(self.env.reset())
-                self.actions = torch.zeros(self.ctx_len, self.env.action_space.n)
-
-            if epoch_end:
-                train_data = zip(
-                        self.batch_nn_inputs, self.batch_actions, self.batch_logp, self.batch_qvals, self.batch_adv
-                )
-
-                for nn_input, action, logp_old, qval, adv in train_data:
-                    yield nn_input, action, logp_old, qval, adv
-
-                self.batch_nn_inputs.clear()
-                self.batch_actions.clear()
-                self.batch_adv.clear()
-                self.batch_logp.clear()
-                self.batch_qvals.clear()
-
-                # logging
-                self.avg_reward = sum(self.epoch_rewards) / self.steps_per_epoch
-
-                # if epoch ended abruptly, exlude last cut-short episode to prevent stats skewness
-                epoch_rewards = self.epoch_rewards
-                if not done:
-                    epoch_rewards = epoch_rewards[:-1]
-
-                total_epoch_reward = sum(epoch_rewards)
-                nb_episodes = len(epoch_rewards)
-
-                self.avg_ep_reward = total_epoch_reward / nb_episodes
-                self.avg_ep_len = (self.steps_per_epoch - steps_before_cutoff) / nb_episodes
-
-                self.epoch_rewards.clear()
-
-            timestep += 1
-
-    def actor_loss(self, nn_inputs, action, logp_old, adv) -> Tensor:
-        ###############################################################################
-        # PPO1:
-        # x: torch.Size([512, 64])
-        # pi: Categorical(probs: torch.Size([512, 4]), logits: torch.Size([512, 4]))
-        # logp: torch.Size([512])
-        ###############################################################################
-        x = self.common_net(nn_inputs)
-        pi, _ = self.actor(x)
-        logp = self.actor.get_log_prob(pi, action)
-        ratio = torch.exp(logp - logp_old)
-        clip_adv = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * adv
-        loss_actor = -(torch.min(ratio * adv, clip_adv)).mean()
-        return loss_actor
-
-    def critic_loss(self, nn_inputs, qval) -> Tensor:
-        ###############################################################################
-        # PPO1:
-        # x: torch.Size([512, 64])
-        # value: torch.Size([512, 1])
-        ###############################################################################
-        x = self.common_net(nn_inputs)
-        value = self.critic(x)
-
-        loss_critic = (qval - value).pow(2).mean()
-        return loss_critic
-
-    def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx, optimizer_idx):
-        """Carries out a single update to actor and critic network from a batch of replay buffer.
-
-        Args:
-            batch: batch of replay buffer/trajectory data
-            batch_idx: not used
-            optimizer_idx: idx that controls optimizing actor or critic network
-
-        Returns:
-            loss
-        """
-        nn_inputs, action, old_logp, qval, adv = batch
-        ###############################################################################
-        # PPO1:
-        # state: torch.Size([512, 8])
-        # action: torch.Size([512])
-        # old_logp: torch.Size([512])
-        # qval: torch.Size([512])
-        # adv: torch.Size([512])
-        ###############################################################################
-        expected_shape = torch.Size([self.batch_size])
-        assert action.shape == expected_shape
-        assert old_logp.shape == expected_shape
-        assert qval.shape == expected_shape
-        assert adv.shape == expected_shape
-
-        # normalize advantages
-        adv = (adv - adv.mean()) / adv.std()
-
-        self.log("avg_ep_len", self.avg_ep_len, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("avg_ep_reward", self.avg_ep_reward, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("avg_reward", self.avg_reward, prog_bar=True, on_step=False, on_epoch=True)
-
-        if optimizer_idx == 0:
-            loss_actor = self.actor_loss(nn_inputs, action, old_logp, adv)
-            self.log("loss_actor", loss_actor, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-            return loss_actor
-
-        if optimizer_idx == 1:
-            loss_critic = self.critic_loss(nn_inputs, qval)
-            self.log("loss_critic", loss_critic, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-
-            return loss_critic
-
-        raise NotImplementedError(
-                f"Got optimizer_idx: {optimizer_idx}. Expected only 2 optimizers from configure_optimizers. "
-                "Modify optimizer logic in training_step to account for this. "
-        )
 
     def configure_optimizers(self) -> List[Optimizer]:
         """Initialize Adam optimizer."""

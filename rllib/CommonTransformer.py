@@ -10,8 +10,11 @@ class CommonTransformer(nn.Module):
     """Simple MLP network."""
 
     def __init__(self, n_states: int, n_actions: int,
-                 max_episode_len: int, out_features: int,
-                 seq_len: int, hidden_size: int = 128):
+                 max_episode_len: int,
+                 out_features: int,
+                 batch_size: int,
+                 seq_len: int,
+                 hidden_size: int = 128):
         """
         Args:
             n_states: observation shape of the environment
@@ -22,6 +25,7 @@ class CommonTransformer(nn.Module):
         self.n_states = n_states
         self.n_actions = n_actions
         self.out_features = out_features
+        self.batch_size = batch_size
         self.seq_len = seq_len
         self.hidden_size = hidden_size
 
@@ -29,88 +33,79 @@ class CommonTransformer(nn.Module):
         self.emb_states = nn.Linear(n_states, hidden_size)
         self.emb_action = nn.Linear(n_actions, hidden_size)
 
-        self.transformer_encoder = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=4, batch_first=True)
-        self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder, num_layers=2)
-        self.pool = nn.AvgPool1d(self.seq_len)  # [5,128] -> [5,1]
+        # self.transformer_encoder = nn.TransformerEncoderLayer(d_model=hidden_size,
+        #                                                       nhead=hidden_size // 8,
+        #                                                       dim_feedforward=256,
+        #                                                       dropout=0.1,
+        #                                                       activation="gelu",
+        #                                                       batch_first=True)
+        # self.transformer = nn.TransformerEncoder(self.transformer_encoder, num_layers=1)
+        self.transformer = nn.Transformer(d_model=hidden_size,
+                                          nhead=hidden_size // 8,
+                                          num_encoder_layers=2,
+                                          num_decoder_layers=2,
+                                          dropout=0.1,
+                                          activation="gelu",
+                                          batch_first=True,
+                                          norm_first=False
+                                          )
+        self.pool = nn.AvgPool1d(self.seq_len)
+        self.conv = nn.Conv1d(self.seq_len, 1, 1)
         # self.pool = nn.AvgPool1d(2 * self.seq_len)  # [5,128] -> [5,1]
 
-        self.out = nn.Sequential(
+        self.fc = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size),
                 nn.ReLU(),
                 nn.Linear(hidden_size, out_features),
         )
 
-    def forward(self, input_x):
+    def forward(self, input_x, batched=False):
         positions, states, actions = input_x
-        # print("positions:", positions)
-        # print("states:", states)
-        # print("actions:", actions)
-        positions = torch.squeeze(positions, dim=-1)
-
         # print("=" * 80)
+
+        # positions = torch.squeeze(positions, dim=-1)
+        padding_mask_pos = torch.where(positions == -1, 1, 0).bool()
+        # print("-" * 80)
+        # print(padding_mask_pos)
+        # print(padding_mask_pos.shape)
+        # print("-" * 80)
         # print(positions)
         # print(positions.shape)
+        positions = torch.where(positions == -1, torch.zeros_like(positions), positions)
+        # print(positions)
+        # print(positions.shape)
+        # print("-" * 80)
         # print(states)
         # print(states.shape)
+        # print("-" * 80)
         # print(actions)
         # print(actions.shape)
 
-        padding_mask_pos = torch.where(positions == -1, 1, 0).bool()  # shape: [25]
-        positions = torch.where(positions == -1, torch.zeros_like(positions), positions)
-        position_embedding = self.emb_pos(positions)
+        positions_emb = self.emb_pos(positions)
+        states_emb = self.emb_states(states)
+        actions_emb = self.emb_action(actions)
 
-        state_emb = self.emb_states(states)
-        action_emb = self.emb_action(actions)
+        # batch_size = 1 if states.dim() == 2 else states.shape[0]
+        states_emb = states_emb + positions_emb
+        actions_emb = actions_emb + positions_emb
 
-        # TODO: add padding_idx to pos_emb call
-
-        # print("-" * 80)
-        # print(position_embedding)
-        # print(position_embedding.shape)
-        # print(state_emb)
-        # print(state_emb.shape)
-        # print(action_emb)
-        # print(action_emb.shape)
-
-        # print(position_embedding.shape)
-        # # print(state_emb.shape)
-        batch_size = 1 if states.dim() == 2 else states.shape[0]
-        state_emb = state_emb + position_embedding
-        action_emb = action_emb + position_embedding
-        if state_emb.dim() == 2:
-            state_emb = state_emb.unsqueeze(0)
-            action_emb = action_emb.unsqueeze(0)
-        # print(state_emb.shape)
-        # print(action_emb.shape)
+        if not batched:
+            states_emb = states_emb.unsqueeze(0)
+            actions_emb = actions_emb.unsqueeze(0)
 
         # torch.Size([1, 2, 25, 128])
         # torch.Size([1, 25, 2, 128])
-        # print(torch.stack(
-        #         (state_emb, action_emb), dim=1
-        # ).shape)
-        # print(torch.stack(
-        #         (state_emb, action_emb), dim=1
-        # ).permute(0, 2, 1, 3).shape)
 
         # stacked_inputs = torch.stack(
         #         (state_emb, action_emb), dim=1
         # ).permute(0, 2, 1, 3).reshape(batch_size, 2 * self.seq_len, self.hidden_size)
 
-        # print(stacked_inputs.shape)
-        # print('-------------------')
-        # print(padding_mask_pos)
-        # print(padding_mask_pos.shape)
-        # print(padding_mask_pos.dim())
-        if padding_mask_pos.dim() == 1:
-            padding_mask_pos = padding_mask_pos.unsqueeze(0)
-        # print(padding_mask_pos.shape)
+        # if padding_mask_pos.dim() == 1:
+        #     padding_mask_pos = padding_mask_pos.unsqueeze(0)
 
         # stacked_attention_mask = torch.stack(
         #         (padding_mask_pos, padding_mask_pos), dim=1
         # ).permute(0, 2, 1).reshape(batch_size, 2 * self.seq_len).bool()
-
-        # print(padding_mask_pos.shape)  # [5]
-        # print(padding_mask_pos.squeeze().shape)
 
         # def forward(self, src: Tensor, mask: Optional[Tensor] = None, src_key_padding_mask: Optional[Tensor] = None) -> Tensor:
         # key_padding_mask: If specified, a mask of shape :math:`(N, S)` indicating which elements within ``key``
@@ -129,28 +124,39 @@ class CommonTransformer(nn.Module):
         #     corresponding position is not allowed to attend. For a float mask, the mask values will be added to
         #     the attention weight.
 
-        trans_imp = state_emb
+        trans_src = states_emb
+        # the source should be one step before the target
+        trans_out = self.transformer(trans_src, trans_src)
+        # print("trans_out.shape", trans_out.shape)
 
-        trans_out = self.transformer_encoder(trans_imp)
-        # x = self.transformer_encoder(stacked_inputs, src_key_padding_mask=stacked_attention_mask)
+        # trans_out shape is [batch_size, seq_len, hidden_size]
+        # for example, it could be [1, 25, 128], [5, 25, 128], etc.
+        # use the average pooling to get the final output
+        # print(trans_out.shape)
 
-        # print('-------------------')
-        # print(x)
-        # print(x.shape)
-        # x = x[1]
-        # print(x.shape)
-        if trans_out.dim() == 2:
-            trans_out = self.pool(trans_out.permute(1, 0)).permute(1, 0)
-        elif trans_out.dim() == 3:
-            trans_out = self.pool(trans_out.permute(0, 2, 1)).permute(0, 2, 1)
+        conv_inp = trans_out
+        # print("conv_inp.shape", conv_inp.shape)
+        conv_out = self.conv(conv_inp)
+        # print("conv_out.shape", conv_out.shape)
+
+        # if trans_out.dim() == 2:
+        #     trans_out = self.pool(trans_out.permute(1, 0)).permute(1, 0)
+        # elif trans_out.dim() == 3:
+        #     trans_out = self.pool(trans_out.permute(0, 2, 1)).permute(0, 2, 1)
 
         ###############################################################################
         # PPO1:
         # out: torch.Size([64]) <--- correct
         ###############################################################################
-        out_imp = trans_out.squeeze()
-        out = self.out(out_imp)
-        return out
+        fc_imp = conv_out.squeeze()
+        fc_out = self.fc(fc_imp)
+
+        if batched:
+            out_shape_expected = torch.Size([self.batch_size, self.out_features])
+        else:
+            out_shape_expected = torch.Size([self.out_features])
+        assert fc_out.shape == out_shape_expected, f"fc_out.shape: {fc_out.shape} != {out_shape_expected}"
+        return fc_out
 
     @staticmethod
     def generate_square_subsequent_mask(sz: int) -> Tensor:
