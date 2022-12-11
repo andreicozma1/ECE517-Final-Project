@@ -48,7 +48,7 @@ class CommonTransformer(nn.Module):
         # print(positions.shape)
         # print(states.shape)
         state_emb = self.state_emb(states)
-        # action_emb = self.action_emb(actions)
+        action_emb = self.action_emb(actions)
 
         # TODO: add padding_idx to pos_emb call
 
@@ -58,18 +58,17 @@ class CommonTransformer(nn.Module):
 
         # print(position_embedding.shape)
         # # print(state_emb.shape)
-        # batch_size = 1 if states.dim() == 2 else states.shape[0]
+        batch_size = 1 if states.dim() == 2 else states.shape[0]
         state_emb = state_emb + position_embedding
-        # action_emb = action_emb + position_embedding
-        # stacked_inputs = torch.stack(
-        #         (state_emb, action_emb), dim=1
-        # ).permute(0, 2, 1, 3).reshape(batch_size, 2 * self.seq_len, self.hidden_size)
-        # stacked_inputs = self.embed_ln(stacked_inputs)
-        # print("-" * 80)
+        action_emb = action_emb + position_embedding
+        stacked_inputs = torch.stack(
+                (state_emb, action_emb), dim=1
+        ).permute(0, 2, 1, 3).reshape(batch_size, 2 * self.seq_len, self.hidden_size)
+        stacked_inputs = self.embed_ln(stacked_inputs)
 
         # print(padding_mask_pos.shape)  # [5]
         # print(padding_mask_pos.squeeze().shape)
-        x = self.transformer_encoder(state_emb)
+        x = self.transformer_encoder(stacked_inputs)
         # print(x.shape)
         if x.dim() == 2:
             x = self.pool(x.permute(1, 0)).permute(1, 0)
