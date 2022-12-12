@@ -10,8 +10,9 @@ from lightning import seed_everything
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
-from rllib.PPO2 import PPO2
 from rllib.PPO1 import PPO1
+from rllib.PPO2 import PPO2
+from rllib.PPO3 import PPO3
 from rllib.Utils import discount_rewards
 from rllib.examples.A2CExample import AdvantageActorCritic
 from rllib.examples.PPOExample import PPO
@@ -34,10 +35,11 @@ class Model:
         model_params = model_params or {}
         # setup model
         models = {
-                "ppo_ex": PPO,
-                "a2c_ex": AdvantageActorCritic,
-                "ppo_1" : PPO1,
-                "ppo_2" : PPO2,
+            "ppo_ex": PPO,
+            "a2c_ex": AdvantageActorCritic,
+            "ppo_1" : PPO1,
+            "ppo_2" : PPO2,
+            "ppo_3" : PPO3,
         }
         if model_name not in models:
             print(f"ERROR: Model {model_name} not supported")
