@@ -60,12 +60,12 @@ class PPO3(LightningModule):
             lr_actor: float = 0.0003,
             lr_critic: float = 0.0005,
             max_episode_len: int = 500,
-            batch_size: int = 1024,
+            batch_size: int = 128,
             steps_per_epoch: int = 2048,
             nb_optim_iters: int = 5,
             clip_ratio: float = 0.2,
             hidden_size: int = 64,
-            ctx_len: int = 25,
+            ctx_len: int = 50,
             **kwargs: Any,
     ) -> None:
         """
@@ -110,7 +110,7 @@ class PPO3(LightningModule):
                                               batch_size=self.batch_size,
                                               seq_len=self.ctx_len
                                               )
-        # self.common_net_2 = CommonBase(self.env.observation_space.shape[0], self.hidden_size)
+        self.common_net_2 = CommonBase(self.env.observation_space.shape[0], self.hidden_size)
 
         # value network
         self.critic = MLP((self.hidden_size,), 1)
@@ -153,34 +153,21 @@ class PPO3(LightningModule):
 
     def reset_all(self):
         self.timesteps = torch.ones(self.ctx_len, dtype=torch.long).to(self.device) * -1 # MARK
-        self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32).to(self.device) # MARK
+        self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32).to(self.device)
         self.add_state(self.env.reset())
         self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32).to(self.device)
-        # self.timesteps = torch.ones(self.ctx_len, dtype=torch.long).to(self.device)  # MARK
-        # self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32).to(self.device) # MARK
-        # self.add_state(self.env.reset())
-        # self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32).to(self.device)
+
 
     def forward(self, nn_inputs) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         pi, action, attention_mask = self.forward_actor(nn_inputs, batched=False)
-        value, _ = self.forward_critic(nn_inputs, batched=False)
-        # print('='*100)
-        # print('post forward')
-        # print('pi.shape', pi)
-        # print('action.shape', action)
-        # print('value.shape', value)
-        # print(action)
+        value, attention_mask = self.forward_critic(nn_inputs, batched=False)
         return pi, action, value, attention_mask
 
     def forward_actor(self, nn_inputs, batched, attention_mask=None):
-        # print("="*100)
-        # print('forward actor')
-        s_comm, _, attention_mask = self.common_net_1(nn_inputs, batched=batched, attention_mask=attention_mask)
-        # print('comm1.shape', comm1.shape)
-        pi, action = self.actor(s_comm)
-        # print('pi.shape', pi)
-        # print('action.shape', action.shape)
-        # print('action',action)
+        _, states, _ = nn_inputs
+        states = states.reshape(-1, self.ctx_len, *self.env.observation_space.shape)
+        states = states[:, -1, :]
+        pi, action = self.actor(self.common_net_2(states))
         return pi, action, attention_mask
 
     def forward_critic(self, nn_inputs, batched, attention_mask=None):
@@ -191,43 +178,16 @@ class PPO3(LightningModule):
     def add_state(self, next_state):
         next_state = torch.from_numpy(next_state).to(self.device)
         next_state = torch.reshape(next_state, (1, -1))
-        # if self.states.shape[0] >= self.ctx_len:
-        #     self.states = self.states[1:]
         self.states = torch.cat((self.states[1:], next_state)) # MARK
-        # self.states = torch.cat((self.states, next_state))
 
     def add_action(self, pi, action):
-        # print('='*100)
-        # print('add_action')
-        # print('action', action)
-        # TODO - check if can use pi.probs
-        # print('pi.probs', pi.probs)
-        # print('pi.probs.shape', pi.probs.shape)
-        action_one_hot = torch.zeros(pi.probs.shape).to(self.device)
-        # print('here')
-        # print('action_one_hot.shape', action_one_hot.shape)
+        log_probs = torch.reshape(pi.probs, (1, -1))
+        self.actions = torch.cat((self.actions[1:], log_probs))
 
-        action_one_hot[action] = 1
-        # print('here2')
-        # print(action_one_hot[action])
-        action_one_hot = torch.reshape(action_one_hot, (1, -1))
-        # print('action_one_hot', action_one_hot)
-        # print('action_one_hot.shape', action_one_hot.shape)
-
-        # if self.actions.shape[0] >= self.ctx_len:
-        #     self.actions = self.actions[1:]
-        self.actions = torch.cat((self.actions[1:], action_one_hot)) # MARK
-
-        # print('self.actions.shape', self.actions)
-        # self.actions = torch.cat((self.actions, action_one_hot))
-        # print('self.actions.shape', self.actions)
     def add_step(self):
         ep_step = torch.Tensor([self.episode_step]).to(self.device)
         ep_step = ep_step.int()
-        # if self.timesteps.shape[0] >= self.ctx_len:
-        #     self.timesteps = self.timesteps[1:]
-        self.timesteps = torch.cat((self.timesteps[1:], ep_step))  # MARK
-        # self.timesteps = torch.cat((self.timesteps, ep_step))
+        self.timesteps = torch.cat((self.timesteps[1:], ep_step))
 
     def eval_start(self):
         self.reset_all()
@@ -258,9 +218,6 @@ class PPO3(LightningModule):
         """
 
         for step in range(self.steps_per_epoch):
-            # print("#"*100)
-            # print("#"*100)
-            # print('step', step)
             self.timesteps = self.timesteps.to(self.device)
             self.states = self.states.to(self.device)
             self.actions = self.actions.to(self.device)
@@ -334,27 +291,11 @@ class PPO3(LightningModule):
                 self.reset_all()
 
             if epoch_end:
-                # print('#' * 100)
-                # print('#' * 100)
-                # print('epoch_end')
                 train_data = zip(
                         self.batch_nn_inputs, self.batch_attention_mask, self.batch_actions, self.batch_logp, self.batch_qvals, self.batch_adv
                 )
-                # print('###############################################################################')
-
-                # print(self.batch_attention_mask)
                 for nn_input, attention_mask, action, logp_old, qval, adv in train_data:
-                    # print('='*100)
-                    # print('yield')
-                    # print('timesteps.shape', nn_input[0].shape)
-                    # print('states.shape', nn_input[1].shape)
-                    # print('actions.shape', nn_input[2].shape)
-                    # print('action.shape',action.shape)
-                    # print('logp_old.shape',logp_old.shape)
-                    # print('qval.shape',qval, type(qval))
-                    # print('adv.shape',adv, type(adv))
                     yield nn_input, attention_mask, action, logp_old, qval, adv
-                # print('done yield')
                 self.batch_nn_inputs.clear()
                 self.batch_actions.clear()
                 self.batch_adv.clear()
