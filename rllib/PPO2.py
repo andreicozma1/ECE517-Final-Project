@@ -103,14 +103,14 @@ class PPO2(LightningModule):
         self.env = gym.make(env)
 
         # common base network
-        self.common_net_1 = CommonTransformer(self.env.observation_space.shape[0],
-                                              self.env.action_space.n,
-                                              max_episode_len=max_episode_len,
-                                              out_features=self.hidden_size,
-                                              batch_size=self.batch_size,
-                                              seq_len=self.ctx_len
-                                              )
-        self.common_net_2 = CommonBase(self.env.observation_space.shape[0], self.hidden_size)
+        self.trans = CommonTransformer(self.env.observation_space.shape[0],
+                                       self.env.action_space.n,
+                                       max_episode_len=max_episode_len,
+                                       out_features=self.hidden_size,
+                                       batch_size=self.batch_size,
+                                       seq_len=self.ctx_len
+                                       )
+        self.other = CommonBase(self.env.observation_space.shape[0], self.hidden_size)
 
         # value network
         self.critic = MLP((self.hidden_size,), 1)
@@ -166,12 +166,12 @@ class PPO2(LightningModule):
         # x = self.common_net_1(nn_inputs, batched=True)
         states = states.reshape(-1, self.ctx_len, *self.env.observation_space.shape)
         states = states[:, -1, :].squeeze()
-        comm2 = self.common_net_2(states)
+        comm2 = self.other(states)
         pi, action = self.actor(comm2)
         return pi, action
 
     def forward_critic(self, nn_inputs, batched):
-        comm1 = self.common_net_1(nn_inputs, batched=batched)
+        comm1 = self.trans(nn_inputs, batched=batched)
         value = self.critic(comm1)
         return value
 
