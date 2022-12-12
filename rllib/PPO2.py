@@ -57,14 +57,14 @@ class PPO2(LightningModule):
             env: str,
             gamma: float = 0.99,
             lam: float = 0.95,
-            lr_actor: float = 0.00001,
-            lr_critic: float = 0.0001,
+            lr_actor: float = 0.0003,
+            lr_critic: float = 0.001,
             max_episode_len: int = 500,
             batch_size: int = 512,
             steps_per_epoch: int = 2048,
             nb_optim_iters: int = 10,
             clip_ratio: float = 0.2,
-            hidden_size: int = 128,
+            hidden_size: int = 64,
             ctx_len: int = 10,
             **kwargs: Any,
     ) -> None:
@@ -107,12 +107,12 @@ class PPO2(LightningModule):
 
         self.transformer = CommonTransformer(self.env.observation_space.shape[0],
                                              self.env.action_space.n,
-                                             self.common_features,
-                                             max_episode_len,
+                                             out_features=self.common_features,
+                                             max_episode_len=max_episode_len,
                                              batch_size=self.batch_size,
                                              seq_len=self.ctx_len,
                                              )
-        self.common = CommonBase(self.common_features * 2, self.hidden_size)
+        self.common = CommonBase(self.common_features, self.hidden_size)
 
         # value network
         self.critic = MLP((self.hidden_size,), 1)
@@ -152,7 +152,7 @@ class PPO2(LightningModule):
         self.reset_all()
 
     def reset_all(self):
-        self.timesteps = torch.ones(self.ctx_len, dtype=torch.int32) * -1
+        self.timesteps = torch.ones(self.ctx_len, 1, dtype=torch.int32) * -1
         self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32)
         # add the first state to the state of time timesteps
         self.states[-1] = torch.from_numpy(self.env.reset())
@@ -166,17 +166,19 @@ class PPO2(LightningModule):
     def forward_actor(self, nn_inputs, training: bool):
         self.timesteps, self.states, self.actions = nn_inputs
         trans_out = self.transformer(nn_inputs, training=training)
-        if training:
-            trans_out = trans_out.reshape(self.batch_size, -1, self.common_features)
-            last_state = self.states[:, -1, :]
-        else:
-            trans_out = trans_out.reshape(1, -1, self.common_features)
-            last_state = self.states[-1, :]
-        trans_out = trans_out[:, -1, :].squeeze()
-        # get the actual last state and concatenate it with predicted state from transformer
-        last_state = last_state.squeeze()
-        comm_inp = torch.cat([trans_out, last_state], dim=-1)
-        print(comm_inp)
+        # TODO: Idea: use the last state of the transformer as input to the critic. E.g. predicted state?
+        # TOOD: For this we'd need both tranformer encoder + decoder and I don't think we'd use conv/pooling at the end
+        # if training:
+        #     trans_out = trans_out.reshape(self.batch_size, -1, self.common_features)
+        #     last_state = self.states[:, -1, :]
+        # else:
+        #     trans_out = trans_out.reshape(1, -1, self.common_features)
+        #     last_state = self.states[-1, :]
+        # trans_out = trans_out[:, -1, :].squeeze()
+        # last_state = last_state.squeeze()
+        # comm_inp = torch.cat([trans_out, last_state], dim=-1)
+        comm_inp = trans_out
+        # print(comm_inp)
         x = self.common(comm_inp)
         pi, action = self.actor(x)
         return pi, action
@@ -184,35 +186,40 @@ class PPO2(LightningModule):
     def forward_critic(self, nn_inputs, training: bool):
         self.timesteps, self.states, self.actions = nn_inputs
         trans_out = self.transformer(nn_inputs, training=training)
-        if training:
-            trans_out = trans_out.reshape(self.batch_size, -1, *self.env.observation_space.shape)
-            last_state = self.states[:, -1, :]
-        else:
-            trans_out = trans_out.reshape(1, -1, *self.env.observation_space.shape)
-            last_state = self.states[-1, :]
-        trans_out = trans_out[:, -1, :].squeeze()
-        # get the actual last state and concatenate it with predicted state from transformer
-        last_state = last_state.squeeze()
-        comm_inp = torch.cat([trans_out, last_state], dim=-1)
-        print(comm_inp)
+        # TODO: Idea: use the last state of the transformer as input to the critic. E.g. predicted state?
+        # TOOD: For this we'd need both tranformer encoder + decoder and I don't think we'd use conv/pooling at the end
+        # if training:
+        #     trans_out = trans_out.reshape(self.batch_size, -1, *self.env.observation_space.shape)
+        #     last_state = self.states[:, -1, :]
+        # else:
+        #     trans_out = trans_out.reshape(1, -1, *self.env.observation_space.shape)
+        #     last_state = self.states[-1, :]
+        # trans_out = trans_out[:, -1, :].squeeze()
+        # last_state = last_state.squeeze()
+        # comm_inp = torch.cat([trans_out, last_state], dim=-1)
+        comm_inp = trans_out
+        # print(comm_inp)
         x = self.common(comm_inp)
         value = self.critic(x)
         return value
 
     def add_state(self, next_state):
         next_state = torch.from_numpy(next_state).to(self.device)
-        next_state = torch.reshape(next_state, (1, -1))
-        self.states = torch.cat((self.states[1:], next_state))
+        self.states = torch.cat((self.states[1:], next_state.unsqueeze(0)))
 
     def add_action(self, pi, action):
         action_one_hot = torch.zeros(pi.probs.shape).to(self.device)
         action_one_hot[action] = 1
-        action_one_hot = torch.reshape(action_one_hot, (1, -1))
         self.actions = torch.cat((self.actions[1:], action_one_hot))
 
     def add_step(self):
         ep_step = torch.Tensor([self.episode_step]).to(self.device)
-        self.timesteps = torch.cat((self.timesteps[1:], ep_step))
+        print(ep_step)
+        print(ep_step.shape)
+        print(self.timesteps)
+        print(self.timesteps.shape)
+
+        self.timesteps = torch.cat((self.timesteps[1:], ep_step.unsqueeze(0)))
 
     def generate_trajectory_samples(self) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
         """Contains the logic for generating trajectory data to train policy and value network.
