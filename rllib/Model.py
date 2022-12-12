@@ -86,15 +86,19 @@ class Model:
         total_rewards, total_steps = 0, 0
         pred_value = []
         hist_rewards = []
+        print(self.name)
+        if 'ppo_3' in self.name:
+            self.model.eval_start()
         while not done:
             state = state.to(device=self.model.device)
             next_state, value, reward, done = None, None, None, None
             # api for models are a bit different for getting state and value
-            if "ppo" in self.name:
+            if "ppo_3" in self.name:
+                next_state, reward, done  = self.model.eval_step()
+            elif "ppo" in self.name:
                 with torch.no_grad():
                     pi, action, value = self.model(state)
                 next_state, reward, done, _ = self.model.env.step(action.cpu().numpy())
-
             elif "a2c" in self.name:
                 with torch.no_grad():
                     action = self.model.agent(state, self.model.device)[0]

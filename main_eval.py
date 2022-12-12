@@ -23,9 +23,9 @@ def main():
         m.load_model(checkpoint_path)
         metrics = m.eval()
         running_reward.append(metrics['total_reward'])
-        metrics |= {
+        metrics.update({
                 "running_reward": np.mean(running_reward),
-        }
+        })
         tq_episode_iter.set_postfix(metrics)
 
 

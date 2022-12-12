@@ -221,6 +221,28 @@ class PPO3(LightningModule):
         self.timesteps = torch.cat((self.timesteps[1:], ep_step))  # MARK
         # self.timesteps = torch.cat((self.timesteps, ep_step))
 
+    def eval_start(self):
+        self.reset_all()
+        self.timesteps = self.timesteps.to(self.device)
+        self.states = self.states.to(self.device)
+        self.actions = self.actions.to(self.device)
+
+    def eval_step(self):
+        with torch.no_grad():
+            print((self.timesteps, self.states, self.actions))
+            pi, action, _, _ = self((self.timesteps, self.states, self.actions))
+            action = torch.squeeze(action)
+            pi.probs = torch.squeeze(pi.probs)
+            pi.logits = torch.squeeze(pi.logits)
+            action_for_step = action.cpu().numpy()
+        next_state, reward, done, _ = self.env.step(action_for_step)
+        self.add_action(pi, action)
+        self.add_state(next_state)
+
+        return next_state, reward, done
+    def eval_stop(self):
+        self.env.close()
+
     def generate_trajectory_samples(self) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
         """Contains the logic for generating trajectory data to train policy and value network.
 
