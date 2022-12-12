@@ -137,13 +137,17 @@ class Model:
         print(f"Saving model checkpoint to: {save_path}")
         torch.save(self.model.state_dict(), save_path)
 
-    def create_wandb_logger(self, wandb_project=None):
+    def create_wandb_logger(self, wandb_project=None, wandb_entity=None):
         wandb_project = wandb_project.strip()
+        wandb_entity = wandb_entity.strip()
         if self.model_hash is None or self.name is None:
             raise ValueError("Model hasn't been created/loaded")
-        self.loggers.append(WandbLogger(project=wandb_project, name=self.model_hash,
+        if wandb_entity == "":
+            self.loggers.append(WandbLogger(project=wandb_project, name=self.model_hash,
                                         group=self.name, tags=["train"]))
-
+        else:
+            self.loggers.append(WandbLogger(project=wandb_project, name=self.model_hash, entity=wandb_entity,
+                                            group=self.name, tags=["train"]))
     def create_csv_logger(self, log_dir):
         log_dir = log_dir.strip()
         if self.model_hash is None:
