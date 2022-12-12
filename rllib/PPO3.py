@@ -152,12 +152,14 @@ class PPO3(LightningModule):
         self.reset_all()
 
     def reset_all(self):
-        self.timesteps = torch.ones(self.ctx_len, dtype=torch.long).to(self.device)  # MARK
+        self.timesteps = torch.ones(self.ctx_len, dtype=torch.long).to(self.device) * -1 # MARK
         self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32).to(self.device) # MARK
-        # add the first state to the state of time timesteps
-        # self.states[-1] = torch.from_numpy(self.env.reset()) # MARK
         self.add_state(self.env.reset())
         self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32).to(self.device)
+        # self.timesteps = torch.ones(self.ctx_len, dtype=torch.long).to(self.device)  # MARK
+        # self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32).to(self.device) # MARK
+        # self.add_state(self.env.reset())
+        # self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32).to(self.device)
 
     def forward(self, nn_inputs) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         pi, action, attention_mask = self.forward_actor(nn_inputs, batched=False)
@@ -189,6 +191,8 @@ class PPO3(LightningModule):
     def add_state(self, next_state):
         next_state = torch.from_numpy(next_state).to(self.device)
         next_state = torch.reshape(next_state, (1, -1))
+        # if self.states.shape[0] >= self.ctx_len:
+        #     self.states = self.states[1:]
         self.states = torch.cat((self.states[1:], next_state)) # MARK
         # self.states = torch.cat((self.states, next_state))
 
@@ -210,6 +214,8 @@ class PPO3(LightningModule):
         # print('action_one_hot', action_one_hot)
         # print('action_one_hot.shape', action_one_hot.shape)
 
+        # if self.actions.shape[0] >= self.ctx_len:
+        #     self.actions = self.actions[1:]
         self.actions = torch.cat((self.actions[1:], action_one_hot)) # MARK
 
         # print('self.actions.shape', self.actions)
@@ -218,6 +224,8 @@ class PPO3(LightningModule):
     def add_step(self):
         ep_step = torch.Tensor([self.episode_step]).to(self.device)
         ep_step = ep_step.int()
+        # if self.timesteps.shape[0] >= self.ctx_len:
+        #     self.timesteps = self.timesteps[1:]
         self.timesteps = torch.cat((self.timesteps[1:], ep_step))  # MARK
         # self.timesteps = torch.cat((self.timesteps, ep_step))
 
@@ -229,7 +237,6 @@ class PPO3(LightningModule):
 
     def eval_step(self):
         with torch.no_grad():
-            print((self.timesteps, self.states, self.actions))
             pi, action, _, _ = self((self.timesteps, self.states, self.actions))
             action = torch.squeeze(action)
             pi.probs = torch.squeeze(pi.probs)

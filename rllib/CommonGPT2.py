@@ -64,15 +64,18 @@ class CommonGPT2(nn.Module):
     def setup_shapes(self, positions, states, actions, batched=False, attention_mask=None):
         # print("="*100)
         # print('pre setup_shapes')
-        # print("positions.shape", positions.shape)
+        # print("positions.shape", positions.shape, )
         # print("states.shape", states.shape)
-        # print("actions.shape", actions.shape)
+        # print("actions.shape", actions.shape, )
+        positions = positions.int()
         if not batched:
             positions = positions.reshape(1, -1)
             states = states.reshape(1, -1, self.n_states)
             actions = actions.reshape(1, -1, self.n_actions)
+        pad_mask = (positions == -1).bool()
+        # print("pad_mask.shape", pad_mask.shape)
+        # print(pad_mask)
         batch_size, seq_length = states.shape[0], states.shape[1]
-
         if self.max_length is not None:
             states = states[:, -self.max_length:]
             actions = actions[:, -self.max_length:]
@@ -80,31 +83,47 @@ class CommonGPT2(nn.Module):
 
             # pad all tokens to sequence length
             if attention_mask is None:
-                attention_mask = torch.cat([torch.zeros(self.max_length-states.shape[1]), torch.ones(states.shape[1])])
-                attention_mask = attention_mask.to(dtype=torch.long, device=states.device).reshape(1, -1)
-            states = torch.cat([
-                    torch.zeros((states.shape[0], self.max_length-states.shape[1], self.n_states), device=states.device),
-                    states
-                ], dim=1).to(dtype=torch.float32)
-            actions = torch.cat([
-                torch.zeros((actions.shape[0], self.max_length - actions.shape[1], self.n_actions), device=actions.device),
-                actions
-            ], dim=1).to(dtype=torch.float32)
-            positions = torch.cat([
-                torch.zeros((positions.shape[0], self.max_length-positions.shape[1]), device=positions.device),
-                positions
-            ],dim=1).to(dtype=torch.long)
+                # attention_mask = torch.cat([torch.zeros(pad_length), torch.ones(self.max_length-pad_length)])
+                # attention_mask = attention_mask.to(dtype=torch.long, device=states.device).reshape(1, -1)
+                attention_mask = torch.ones((1,self.max_length)).to(dtype=torch.long, device=states.device)
+                attention_mask[pad_mask] = 0
+                # attention_mask = attention_mask.to(dtype=torch.long, device=states.device).reshape(1, -1)
+            # states = torch.cat([
+            #         # torch.zeros((states.shape[0], pad_length, self.n_states), device=states.device),
+            #         torch.zeros((states.shape[0], self.max_length-states.shape[1], self.n_states), device=states.device),
+            #         states[:,pad_length:]
+            #     ], dim=1).to(dtype=torch.float32)
+            states[pad_mask] = 0
+            actions[pad_mask] = 0
+            positions[pad_mask] = 0
+
+
+            # actions = torch.cat([
+            #     torch.zeros((actions.shape[0], pad_length, self.n_actions), device=actions.device),
+            #     actions[:,pad_length:]
+            # ], dim=1).to(dtype=torch.float32)
+            # positions = torch.cat([
+            #     torch.zeros((positions.shape[0], pad_length), device=positions.device),
+            #     positions[:,pad_length:]
+            # ],dim=1).to(dtype=torch.long)
             seq_length = self.max_length
         else:
             attention_mask = torch.ones((batch_size, seq_length), dtype=torch.long)
 
+        states.to(dtype=torch.float32)
+        actions.to(dtype=torch.float32)
+        positions.to(dtype=torch.long)
         # print("="*100)
         # print('post setup_shapes')
         # print(f'batch_size: {batch_size}, seq_length: {seq_length}')
         # print("positions.shape", positions.shape)
+        # print(positions)
         # print("states.shape", states.shape)
+        # print(states)
         # print("actions.shape", actions.shape)
-        # print("attention_mask.shape", attention_mask.shape)
+        # print(actions)
+        # print("attention_mask.shape", attention_mask.shape, )
+        # print(attention_mask)
         return batch_size, seq_length, positions, states, actions, attention_mask
 
     def forward(self, input_x, batched=False, attention_mask=None):
