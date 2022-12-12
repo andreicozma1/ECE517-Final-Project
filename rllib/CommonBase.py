@@ -14,6 +14,7 @@ class CommonBase(nn.Module):
             out_features: size of hidden layers
         """
         super().__init__()
+        print(in_features, out_features)
         self.net = nn.Sequential(
                 nn.Linear(in_features, out_features),
                 nn.ReLU(),
