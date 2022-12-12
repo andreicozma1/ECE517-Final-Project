@@ -57,15 +57,15 @@ class PPO2(LightningModule):
             env: str,
             gamma: float = 0.99,
             lam: float = 0.95,
-            lr_actor: float = 0.0003,
-            lr_critic: float = 0.0005,
+            lr_actor: float = 0.00001,
+            lr_critic: float = 0.0001,
             max_episode_len: int = 500,
-            batch_size: int = 1024,
+            batch_size: int = 512,
             steps_per_epoch: int = 2048,
-            nb_optim_iters: int = 5,
+            nb_optim_iters: int = 10,
             clip_ratio: float = 0.2,
-            hidden_size: int = 64,
-            ctx_len: int = 25,
+            hidden_size: int = 128,
+            ctx_len: int = 10,
             **kwargs: Any,
     ) -> None:
         """
@@ -102,15 +102,17 @@ class PPO2(LightningModule):
 
         self.env = gym.make(env)
 
-        # common base network
-        self.common_net_1 = CommonTransformer(self.env.observation_space.shape[0],
-                                              self.env.action_space.n,
-                                              self.hidden_size,
-                                              max_episode_len,
-                                              batch_size=self.batch_size,
-                                              seq_len=self.ctx_len
-                                              )
-        self.common_net_2 = CommonBase(self.env.observation_space.shape[0], self.hidden_size)
+        self.common_features = self.env.observation_space.shape[0]
+        # self.common_features = self.hidden_size
+
+        self.transformer = CommonTransformer(self.env.observation_space.shape[0],
+                                             self.env.action_space.n,
+                                             self.common_features,
+                                             max_episode_len,
+                                             batch_size=self.batch_size,
+                                             seq_len=self.ctx_len,
+                                             )
+        self.common = CommonBase(self.common_features * 2, self.hidden_size)
 
         # value network
         self.critic = MLP((self.hidden_size,), 1)
@@ -156,23 +158,45 @@ class PPO2(LightningModule):
         self.states[-1] = torch.from_numpy(self.env.reset())
         self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32)
 
-    def forward(self, nn_inputs) -> Tuple[Tensor, Tensor, Tensor]:
-        pi, action = self.forward_actor(nn_inputs)
-        value = self.forward_critic(nn_inputs, batched=False)
+    def forward(self, nn_inputs, training: bool) -> Tuple[Tensor, Tensor, Tensor]:
+        pi, action = self.forward_actor(nn_inputs, training=training)
+        value = self.forward_critic(nn_inputs, training=training)
         return pi, action, value
 
-    def forward_actor(self, nn_inputs):
-        _, states, _ = nn_inputs
-        # x = self.common_net_1(nn_inputs, batched=True)
-        states = states.reshape(-1, self.ctx_len, *self.env.observation_space.shape)
-        states = states[:, -1, :].squeeze()
-        comm2 = self.common_net_2(states)
-        pi, action = self.actor(comm2)
+    def forward_actor(self, nn_inputs, training: bool):
+        self.timesteps, self.states, self.actions = nn_inputs
+        trans_out = self.transformer(nn_inputs, training=training)
+        if training:
+            trans_out = trans_out.reshape(self.batch_size, -1, self.common_features)
+            last_state = self.states[:, -1, :]
+        else:
+            trans_out = trans_out.reshape(1, -1, self.common_features)
+            last_state = self.states[-1, :]
+        trans_out = trans_out[:, -1, :].squeeze()
+        # get the actual last state and concatenate it with predicted state from transformer
+        last_state = last_state.squeeze()
+        comm_inp = torch.cat([trans_out, last_state], dim=-1)
+        print(comm_inp)
+        x = self.common(comm_inp)
+        pi, action = self.actor(x)
         return pi, action
 
-    def forward_critic(self, nn_inputs, batched):
-        comm1 = self.common_net_1(nn_inputs, batched=batched)
-        value = self.critic(comm1)
+    def forward_critic(self, nn_inputs, training: bool):
+        self.timesteps, self.states, self.actions = nn_inputs
+        trans_out = self.transformer(nn_inputs, training=training)
+        if training:
+            trans_out = trans_out.reshape(self.batch_size, -1, *self.env.observation_space.shape)
+            last_state = self.states[:, -1, :]
+        else:
+            trans_out = trans_out.reshape(1, -1, *self.env.observation_space.shape)
+            last_state = self.states[-1, :]
+        trans_out = trans_out[:, -1, :].squeeze()
+        # get the actual last state and concatenate it with predicted state from transformer
+        last_state = last_state.squeeze()
+        comm_inp = torch.cat([trans_out, last_state], dim=-1)
+        print(comm_inp)
+        x = self.common(comm_inp)
+        value = self.critic(x)
         return value
 
     def add_state(self, next_state):
@@ -188,7 +212,6 @@ class PPO2(LightningModule):
 
     def add_step(self):
         ep_step = torch.Tensor([self.episode_step]).to(self.device)
-        ep_step = ep_step.int()
         self.timesteps = torch.cat((self.timesteps[1:], ep_step))
 
     def generate_trajectory_samples(self) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
@@ -214,7 +237,7 @@ class PPO2(LightningModule):
                 # log_prob: torch.Size([])
                 ###############################################################################
 
-                pi, action, value = self((self.timesteps, self.states, self.actions))
+                pi, action, value = self((self.timesteps, self.states, self.actions), training=False)
                 log_prob = self.actor.get_log_prob(pi, action)
 
             self.add_action(pi, action)
@@ -245,7 +268,7 @@ class PPO2(LightningModule):
                 if (terminal or epoch_end) and not done:
                     # self.states = self.states.to(device=self.device)
                     with torch.no_grad():
-                        _, _, value = self((self.timesteps, self.states, self.actions))
+                        _, _, value = self((self.timesteps, self.states, self.actions), training=False)
                         last_value = value.item()
                         steps_before_cutoff = self.episode_step
                 else:
@@ -352,7 +375,7 @@ class PPO2(LightningModule):
         # pi: Categorical(probs: torch.Size([512, 4]), logits: torch.Size([512, 4]))
         # logp: torch.Size([512])
         ###############################################################################
-        pi, _ = self.forward_actor(nn_inputs)
+        pi, _ = self.forward_actor(nn_inputs, training=True)
         logp = self.actor.get_log_prob(pi, action)
         ratio = torch.exp(logp - logp_old)
         clip_adv = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio) * adv
@@ -365,7 +388,7 @@ class PPO2(LightningModule):
         # x: torch.Size([512, 64])
         # value: torch.Size([512, 1])
         ###############################################################################
-        value = self.forward_critic(nn_inputs, batched=True)
+        value = self.forward_critic(nn_inputs, training=True)
         loss_critic = (qval - value).pow(2).mean()
         return loss_critic
 
