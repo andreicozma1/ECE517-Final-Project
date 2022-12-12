@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 import torch
+from lightning import seed_everything
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
@@ -18,7 +19,11 @@ from rllib.examples.PPOExample import PPO
 
 class Model:
 
-    def __init__(self):
+    def __init__(self, seed=None):
+        self.seed = seed
+        if seed is not None:
+            print(f"WARNING: Seeding everything with seed: {seed}")
+            seed_everything(self.seed)
         self.model = None
         self.name = None
         self.model_hash = None

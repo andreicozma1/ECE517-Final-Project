@@ -13,8 +13,9 @@ def main():
     num_epochs = args.num_epochs
     wandb_proj = args.wandb_project
     val_check_interval = args.val_check_interval
+    seed = args.seed
 
-    m = Model()
+    m = Model(seed=seed)
     m.create_model(env, model_name)
     m.create_wandb_logger(wandb_proj)
     m.train(num_epochs, val_check_interval)
@@ -28,6 +29,7 @@ def parse_args():
     parser.add_argument("-ne", "--num_epochs", type=int, default=150)
     parser.add_argument("--val_check_interval", type=int, default=5)
     parser.add_argument("--wandb_project", type=str, default="rl_project")
+    parser.add_argument("--seed", type=str, default="123")
     return parser.parse_args()
 
 

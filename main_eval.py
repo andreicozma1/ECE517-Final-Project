@@ -13,8 +13,9 @@ def main():
     running_rew_len = args.running_rew_len
     num_episodes = args.num_episodes
     checkpoint_path = args.file_path
+    seed = args.seed
 
-    m = Model()
+    m = Model(seed=seed)
 
     running_reward: collections.deque = collections.deque(maxlen=running_rew_len)
     tq_episode_iter = tqdm(range(num_episodes), leave=False, desc="Episode")
@@ -34,6 +35,7 @@ def parse_args():
     parser.add_argument("-f", "--file_path", type=str, required=True)
     parser.add_argument("-ne", "--num_episodes", type=int, default=5)
     parser.add_argument("--running_rew_len", type=int, default=50)
+    parser.add_argument("--seed", type=str, default="123")
     return parser.parse_args()
 
 

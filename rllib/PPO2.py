@@ -58,14 +58,14 @@ class PPO2(LightningModule):
             gamma: float = 0.99,
             lam: float = 0.95,
             lr_actor: float = 0.0003,
-            lr_critic: float = 0.001,
-            max_episode_len: int = 200,
+            lr_critic: float = 0.0005,
+            max_episode_len: int = 500,
             batch_size: int = 1024,
             steps_per_epoch: int = 2048,
             nb_optim_iters: int = 5,
             clip_ratio: float = 0.2,
             hidden_size: int = 64,
-            ctx_len: int = 10,
+            ctx_len: int = 25,
             **kwargs: Any,
     ) -> None:
         """
@@ -105,8 +105,8 @@ class PPO2(LightningModule):
         # common base network
         self.common_net_1 = CommonTransformer(self.env.observation_space.shape[0],
                                               self.env.action_space.n,
-                                              max_episode_len=max_episode_len,
-                                              out_features=self.hidden_size,
+                                              self.hidden_size,
+                                              max_episode_len,
                                               batch_size=self.batch_size,
                                               seq_len=self.ctx_len
                                               )
