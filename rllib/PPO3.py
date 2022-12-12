@@ -175,17 +175,17 @@ class PPO3(LightningModule):
     def forward_actor(self, nn_inputs, batched, attention_mask=None):
         # print("="*100)
         # print('forward actor')
-        comm1, attention_mask = self.common_net_1(nn_inputs, batched=batched, attention_mask=attention_mask)
+        s_comm, _, attention_mask = self.common_net_1(nn_inputs, batched=batched, attention_mask=attention_mask)
         # print('comm1.shape', comm1.shape)
-        pi, action = self.actor(comm1)
+        pi, action = self.actor(s_comm)
         # print('pi.shape', pi)
         # print('action.shape', action.shape)
         # print('action',action)
         return pi, action, attention_mask
 
     def forward_critic(self, nn_inputs, batched, attention_mask=None):
-        comm1, attention_mask = self.common_net_1(nn_inputs, batched=batched, attention_mask=attention_mask)
-        value = self.critic(comm1)
+        _, sa_comm, attention_mask = self.common_net_1(nn_inputs, batched=batched, attention_mask=attention_mask)
+        value = self.critic(sa_comm)
         return value, attention_mask
 
     def add_state(self, next_state):

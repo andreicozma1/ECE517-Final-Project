@@ -58,7 +58,7 @@ class CommonGPT2(nn.Module):
         # note: the only difference between this GPT2Model and the default Huggingface version
         # is that the positional embeddings are removed (since we'll add those ourselves)
         self.transformer = GPT2Model(config)
-        self.linear_layer = torch.nn.Linear(hidden_size, hidden_size)
+        # self.linear_layer = torch.nn.Linear(hidden_size, hidden_size)
 
 
     def setup_shapes(self, positions, states, actions, batched=False, attention_mask=None):
@@ -192,18 +192,19 @@ class CommonGPT2(nn.Module):
 
         # state x[:,0] is the output of the transformer
         # state and action x[:,1] is the output of the transformer
-        x = x[:,0]  # only state
-        # x = x[:,1]  # state and action
+        state_pred = x[:,0]  # only state
+        state_action_pred = x[:,1]  # state and action
 
         # linear layer just bc
-        x = self.linear_layer(x)
+        # x = self.linear_layer(x)
         # print("="*100)
         # print('post linear')
         # print('x.shape', x.shape)
 
         # slice last prediction
-        x = x[:, -1]
+        state_pred = state_pred[:, -1]
+        state_action_pred = state_action_pred[:, -1]
         # print("="*100)
         # print('post slice')
         # print('x.shape', x.shape)
-        return x, attention_mask
+        return state_pred, state_action_pred, attention_mask
