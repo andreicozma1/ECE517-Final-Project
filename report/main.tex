@@ -138,14 +138,16 @@
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
+\usepackage{hyperref}
+
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
 
-\title{GPT2PPO: Auto Regressive Proximal Policy Optimization*\\
-{\footnotesize \textsuperscript{*}Note: Sub-titles are not captured in Xplore and
-should not be used}
-\thanks{Identify applicable funding agency here. If none, delete this.}
+\title{GPT2PPO: Auto Regressive Proximal Policy Optimization\\
+% {\footnotesize \textsuperscript{*}Note: Sub-titles are not captured in Xplore and
+% should not be used}
+% \thanks{Identify applicable funding agency here. If none, delete this.}
 }
 
 \author{\IEEEauthorblockN{1\textsuperscript{st} Andrei Cozma}
@@ -220,65 +222,53 @@ PPO citation - \cite{schulman2017proximal}
 %clarify.
 \section{Background}
 % \label{sec:background}
-\cite{brockman2016openai}
-% All of the environments used in this project are from the OpenAI Gym library \cite{brockman2016openai}. The environments are described below.
+
+All of the environments used in this project are from the OpenAI Gym library \cite{brockman2016openai}. The environments are described below.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Lunar Lander}
+% https://www.gymlibrary.dev/environments/box2d/lunar_lander/
+% Rewards
+% Reward for moving from the top of the screen to the landing pad and coming to rest is about 100-140 points. If the lander moves away from the landing pad, it loses reward. If the lander crashes, it receives an additional -100 points. If it comes to rest, it receives an additional +100 points. Each leg with ground contact is +10 points. Firing the main engine is -0.3 points each frame. Firing the side engine is -0.03 points each frame. Solved is 200 points.
+% The Lunar Lander environment is rocket trajectory optimization problem. The OpenAI Gym offers two versions of the environment: discrete or continuous. 
+% Starting State
+% The lander starts at the top center of the viewport with a random initial force applied to its center of mass.
 
-The Lunar Lander environment is rocket trajectory optimization problem. The OpenAI Gym offers two versions of the environment: discrete or continuous. 
-In this work we only use the discrete version. The state space is a 8-dimensional vector containing the position and velocity of the rocket, the angle and angular velocity of the rocket, and the position of the landing pad.
+% Episode Termination
+% The episode finishes if:
+% the lander crashes (the lander body gets in contact with the moon);
+% the lander gets outside of the viewport (x coordinate is greater than 1);
+% the lander is not awake. From the Box2D docs, a body which is not awake is a body which doesn’t move and doesn’t collide with any other body:
+% \href{https://www.gymlibrary.dev/environments/box2d/lunar_lander/}
+The lunar lander environment is a rocket trajectory optimization problem 
+\footnote{OpenAI Gym Lunar Lander: \url{https://www.gymlibrary.dev/environments/box2d/lunar_lander}}.
+The OpenAI Gym offers two versions of the environment: discrete or continuous.
+In this work we only use the discrete version. 
+The state space is a 8-dimensional vector containing the x and y positional coordinates of the agent, its x and y linear velocities,
+its angle, its angular velocity, and two booleans that represent whether each leg is in contact with the ground or not.
+The action space is a single discrete scalar with values ranging from 0 to 3. The values corresponspond to the following actions: 
+do nothing, fire left orientation engine, fire main engine, fire right orientation engine.
 
 \begin{figure}[htbp]
-    \centerline{\includegraphics{./img/lunar-lander-env.png}}
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-env.png}}
     \caption{The Lunar Lander environment.}
     \label{lunar-lander-env}
 \end{figure}
 
-% \begin{figure}[htbp]
-%     \centerline{\includegraphics{fig1.png}}
-%     \caption{Example of a figure caption.}
-%     \label{fig}
-% \end{figure}
-% \begin{table}[t]
-%     \caption{Classification accuracies for naive Bayes and flexible
-%         Bayes on various data sets.}
-%     \label{sample-table}
-%     \vskip 0.15in
-%     \begin{center}
-%         \begin{small}
-%             \begin{sc}
-%                 \begin{tabular}{lcccr}
-%                     \toprule
-%                     Data set  & Naive         & Flexible      & Better?  \\
-%                     \midrule
-%                     Breast    & 95.9$\pm$ 0.2 & 96.7$\pm$ 0.2 & $\surd$  \\
-%                     Cleveland & 83.3$\pm$ 0.6 & 80.0$\pm$ 0.6 & $\times$ \\
-%                     Glass2    & 61.9$\pm$ 1.4 & 83.8$\pm$ 0.7 & $\surd$  \\
-%                     Credit    & 74.8$\pm$ 0.5 & 78.3$\pm$ 0.6 &          \\
-%                     Horse     & 73.3$\pm$ 0.9 & 69.7$\pm$ 1.0 & $\times$ \\
-%                     Meta      & 67.1$\pm$ 0.6 & 76.5$\pm$ 0.5 & $\surd$  \\
-%                     Pima      & 75.1$\pm$ 0.6 & 73.9$\pm$ 0.5 &          \\
-%                     Vehicle   & 44.9$\pm$ 0.6 & 61.5$\pm$ 0.4 & $\surd$  \\
-%                     \bottomrule
-%                 \end{tabular}
-%             \end{sc}
-%         \end{small}
-%     \end{center}
-%     \vskip -0.1in
-% \end{table}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Acrobot}
+\footnote{OpenAI Gym Acrobot: \url{https://www.gymlibrary.dev/environments/classic_control/acrobot}}.
 
 \begin{figure}[htbp]
-    \centerline{\includegraphics{./img/acrobot-env.png}}
+    \centerline{\includegraphics[width=\columnwidth]{./img/acrobot-env.png}}
     \caption{The Acrobot environment.}
     \label{acrobot-env}
 \end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Bipedal Walker}
+\footnote{OpenAI Gym Acrobot: \url{https://www.gymlibrary.dev/environments/box2d/bipedal_walker}}.
 
 % \begin{figure}[htbp]
 %     \centerline{\includegraphics{/img/bipedal-walker-env.png}}

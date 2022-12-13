@@ -209,8 +209,8 @@ class PPO3(LightningModule):
         with torch.no_grad():
             pi, action, _, _ = self((self.timesteps, self.states, self.actions))
             action = torch.squeeze(action)
-            pi.probs = torch.squeeze(pi.probs)
-            pi.logits = torch.squeeze(pi.logits)
+            # pi.probs = torch.squeeze(pi.probs)
+            # pi.logits = torch.squeeze(pi.logits)
             action_for_step = action.cpu().numpy()
         next_state, reward, done, _ = self.env.step(action_for_step)
         self.add_action(pi, action)
