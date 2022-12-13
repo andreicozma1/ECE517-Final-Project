@@ -319,39 +319,81 @@ The episode terminates if the agent's hull makes contact with the ground or if t
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Utilized Libraries}
+In this work we chose to use pytorch as our main deep learning library. Pytorch is a popular deep learning library that is well documented and has a large community.
+To help maintain the structure of the models we also used the Pytorch-Lightning library. 
+Pytorch-Lightning is a high-level library that allows for easy training and testing of models.
+Pytorch-Lightning also provides a module named Lightning-Bolts that contains many pre-built models and utilities.
+For the GPT2 implementation we used the HuggingFace Transformers library.
+We use the OpenAI Gym Library to provide the environments for our models to train and test on\cite{brockman2016openai}.
+Finally, we use wandb to log the results of all of our experiments\cite{wandb}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{File Structure}
 
+This works file structure is as follows. The main directory contains the \textbf{main\_train.py} and \textbf{main\_eval.py} files. 
+These files are used to train and test the models respectively. The core code is contained within the \textbf{rllib} directory. 
+The Within the \textbf{rllib/examples} contains an A2C and PPO baseline implementations that were taken from the Lighting-Bolts library, 
+copied into our project. 
+
+Within the \textbf{rllib} directory there are many files. The important files are the files that are primarily used 
+are: \textbf{Model.py}, \textbf{GPT2PPO.py}, \textbf{CommonGPT2.py}, \textbf{CommonBase.py}, and \textbf{GPT2.py}.
+These files will be discussed in more detail in the following sections.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Training and Testing Models}
+\subsection{Training and Testing Tools}
+To train a model we use the \textbf{main\_train.py} file. This file will train a model on a given environment and log the results.
+To train a model we use the following command:
+\begin{center}
+    \texttt{python3 main\_train.py \textbackslash \\}
+    \texttt{-m ppo\_gpt \textbackslash \\}
+    \texttt{-e LunarLander-v2}
+\end{center}
 
-\textbf{main\_train.py} text here kasljf aslkdjasdlk aslksdakljaslkj askajklaskjlsjkls s.
+For the \textbf{main\_train.py} file we have the following additional command line arguments:
+\begin{itemize}
+    \item \texttt{-e} or \texttt{--env} - The Open AI Gym environment [Default: LunarLander-v2]
+    \item \texttt{-m} or \texttt{--model\_name} - The name of the model to train [Default: ppo\_ex (PPO)]
+    \item \texttt{-ne} or \texttt{--num\_epochs} - The number of epochs to train for [Default: 150]
+    \item \texttt{--al\_check\_interval} - The itervale of epochs to run validation [Default: 5]
+    \item \texttt{--wandb\_project} - The wandb project to log to [Default: rl\_project]
+    \item \texttt{--wandb\_entity} - The wandb entity to log to [Default: ece517]
+    \item \texttt{--seed} - The seed value for training [Default: 123]
+\end{itemize}
 
-\textbf{main\_eval.py} text here kasljf aslkdjasdlk aslksdakljaslkj askajklaskjlsjkls s.
+The training command will train the model then save the trained model to the checkpoints directory with the following structure:
+\begin{center}
+    \texttt{checkpoints/\\<model\_name>/\\<env\_name>/\\<model\_hash>.pt}
+\end{center}
 
+To test a model (watch it interact in the environment) we use the \textbf{main\_eval.py}. This file will load a model from the checkpoints directory and 
+run it in the environment.
+To test a model we use the following command:
+\begin{center}
+    \texttt{python3 main\_eval.py -f <model\_checkpoint>}
+\end{center}
+
+For the \textbf{main\_eval.py} file we have the following additional command line arguments:
+\begin{itemize}
+    \item \texttt{-f} or \texttt{--file\_path} - The path to the model checkpoint
+    \item \texttt{-ne} or \texttt{--num\_episodes} - The number of episodes to run [Default: 5]
+    \item \texttt{--running\_rew\_len} - The length of rewards to store at once [Default: 50]
+    \item \texttt{--seed} - The seed value for testing [Default: 123]
+\end{itemize}
+
+Both the \textbf{main\_train.py} and \textbf{main\_eval.py} files utilize the \textbf{rllib/Model.py} file. 
+This file abstracts the training and evaluation process from the training and testing commands into a class named Model. 
+It simply loads in the correct model and trains or tests it.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Models}
 
-\textbf{rllib/examples/PPOExample.py}
+The baseline PPO model we use to compare against our results is in the \textbf{rllib/examples/PPOExample.py} file.
+In it contains code taken from the Lighting-Bolts library with no modifications. We store this model locally to protect against 
+any future api changes in the library. The file contains a class named PPO that inherits from the LightningModule class.
+Our implementation is builds upon this class.
 
-\textbf{rllib/PPO3.py}
-
-%Regarding the code structure employed, we have two main Python files called \texttt{Q\_Learning.py} and \texttt{runEpisode.py}.
-%
-%The other files are found in the \texttt{rlenv} and \texttt{rllib} folders. The \texttt{rlenv} folder contains the code for the game environment in \texttt{pongclass.py}, while the \texttt{rllib} folder contains \texttt{agent. py}, which contains the code for the Q-Learning and SARSA agents, as well as \texttt{utils.py}, which contains utility functions for parsing command line arguments.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\subsection{main\_train.py}
-% \label{subsec:train.py}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\subsection{main\_eval.py}
-% \label{subsec:eval.py}
+This works implementation resides at \textbf{rllib/GPT2PPO.py}. This file contains the GPT2PPO class which implements the same interface as
+the reference PPO. 
 
 
 

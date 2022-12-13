@@ -29,4 +29,10 @@ G.~Brockman, V.~Cheung, L.~Pettersson, J.~Schneider, J.~Schulman, J.~Tang, and
 R.~S. Sutton and A.~G. Barto, \emph{Reinforcement learning: An
   introduction}.\hskip 1em plus 0.5em minus 0.4em\relax MIT press, 2018.
 
+\bibitem{wandb}
+\BIBentryALTinterwordspacing
+L.~Biewald, ``Experiment tracking with weights and biases,'' 2020, software
+  available from wandb.com. [Online]. Available: \url{https://www.wandb.com/}
+\BIBentrySTDinterwordspacing
+
 \end{thebibliography}
