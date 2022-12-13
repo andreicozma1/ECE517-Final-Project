@@ -103,8 +103,14 @@ class PPO3(LightningModule):
         self.env = gym.make(env)
 
         # common base network
+        if isinstance(self.env.action_space, gym.spaces.box.Box):
+            self.act_dim = self.env.action_space.shape[0]
+        elif isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
+            self.act_dim = self.env.action_space.n
+        print('#'*100)
+        print(self.act_dim)
         self.common_net_1 = CommonGPT2(self.env.observation_space.shape[0],
-                                              self.env.action_space.n,
+                                              self.act_dim,
                                               self.hidden_size,
                                               max_episode_len,
                                               batch_size=self.batch_size,
@@ -155,7 +161,7 @@ class PPO3(LightningModule):
         self.timesteps = torch.ones(self.ctx_len, dtype=torch.long).to(self.device) * -1 # MARK
         self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32).to(self.device)
         self.add_state(self.env.reset())
-        self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32).to(self.device)
+        self.actions = torch.zeros(self.ctx_len, self.act_dim, dtype=torch.float32).to(self.device)
 
 
     def forward(self, nn_inputs) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
@@ -181,8 +187,12 @@ class PPO3(LightningModule):
         self.states = torch.cat((self.states[1:], next_state))
 
     def add_action(self, pi, action):
-        log_probs = torch.reshape(pi.probs, (1, -1))
-        self.actions = torch.cat((self.actions[1:], log_probs))
+        if isinstance(self.env.action_space, gym.spaces.box.Box):
+            self.act_dim = self.env.action_space.shape[0]
+            self.actions = torch.cat((self.actions[1:], action.unsqueeze(0)))
+        elif isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
+            log_probs = torch.reshape(pi.probs, (1, -1))
+            self.actions = torch.cat((self.actions[1:], log_probs))
 
     def add_step(self):
         ep_step = torch.Tensor([self.episode_step]).to(self.device)
@@ -234,8 +244,8 @@ class PPO3(LightningModule):
                 ###############################################################################
                 pi, action, value, attention_mask = self((self.timesteps, self.states, self.actions))
                 action, value = torch.squeeze(action), torch.squeeze(value)
-                pi.probs = torch.squeeze(pi.probs)
-                pi.logits = torch.squeeze(pi.logits)
+                # pi.probs = torch.squeeze(pi.probs)
+                # pi.logits = torch.squeeze(pi.logits)
                 attention_mask = torch.squeeze(attention_mask)
                 # print('gen_episode')
                 # print(action)
@@ -340,8 +350,8 @@ class PPO3(LightningModule):
         # adv: torch.Size([512])
         ###############################################################################
         expected_shape = torch.Size([self.batch_size])
-        assert action.shape == expected_shape, f"action shape {action.shape} != {expected_shape}"
-        assert old_logp.shape == expected_shape, f"old_logp shape {old_logp.shape} != {expected_shape}"
+        # assert action.shape == expected_shape, f"action shape {action.shape} != {expected_shape}"
+        # assert old_logp.shape == expected_shape, f"old_logp shape {old_logp.shape} != {expected_shape}"
         assert qval.shape == expected_shape, f"qval shape {qval.shape} != {expected_shape}"
         assert adv.shape == expected_shape, f"adv shape {adv.shape} != {expected_shape}"
 
@@ -389,10 +399,7 @@ class PPO3(LightningModule):
         # x: torch.Size([512, 64])
         # value: torch.Size([512, 1])
         ###############################################################################
-        # print('###############################################################################')
         value, _ = self.forward_critic(nn_inputs, batched=True, attention_mask=attention_mask)
-        # print("# value: ", value.shape)
-        # print('###############################################################################')
         loss_critic = (qval - value).pow(2).mean()
         return loss_critic
 
@@ -459,30 +466,3 @@ class PPO3(LightningModule):
         """Get train loader."""
         return self._dataloader()
 
-    @staticmethod
-    def add_model_specific_args(parent_parser):  # pragma: no cover
-        parser = argparse.ArgumentParser(parents=[parent_parser])
-        parser.add_argument("--env", type=str, default="CartPole-v0")
-        parser.add_argument("--gamma", type=float, default=0.99, help="discount factor")
-        parser.add_argument("--lam", type=float, default=0.95, help="advantage discount factor")
-        parser.add_argument("--lr_actor", type=float, default=3e-4, help="learning rate of actor network")
-        parser.add_argument("--lr_critic", type=float, default=1e-3, help="learning rate of critic network")
-        parser.add_argument("--max_episode_len", type=int, default=1000, help="capacity of the replay buffer")
-        parser.add_argument("--batch_size", type=int, default=512, help="batch_size when training network")
-        parser.add_argument(
-                "--steps_per_epoch",
-                type=int,
-                default=2048,
-                help="how many action-state pairs to rollout for trajectory collection per epoch",
-        )
-        parser.add_argument(
-                "--nb_optim_iters",
-                type=int,
-                default=4,
-                help="how many steps of gradient descent to perform on each batch"
-        )
-        parser.add_argument(
-                "--clip_ratio", type=float, default=0.2, help="hyperparameter for clipping in the policy objective"
-        )
-
-        return parser
