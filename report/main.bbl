@@ -35,4 +35,28 @@ L.~Biewald, ``Experiment tracking with weights and biases,'' 2020, software
   available from wandb.com. [Online]. Available: \url{https://www.wandb.com/}
 \BIBentrySTDinterwordspacing
 
+\bibitem{chen2021decision}
+L.~Chen, K.~Lu, A.~Rajeswaran, K.~Lee, A.~Grover, M.~Laskin, P.~Abbeel,
+  A.~Srinivas, and I.~Mordatch, ``Decision transformer: Reinforcement learning
+  via sequence modeling,'' \emph{Advances in neural information processing
+  systems}, vol.~34, pp. 15\,084--15\,097, 2021.
+
+\bibitem{radford2019language}
+A.~Radford, J.~Wu, R.~Child, D.~Luan, D.~Amodei, I.~Sutskever \emph{et~al.},
+  ``Language models are unsupervised multitask learners,'' \emph{OpenAI blog},
+  vol.~1, no.~8, p.~9, 2019.
+
+\bibitem{wolf-etal-2020-transformers}
+\BIBentryALTinterwordspacing
+T.~Wolf, L.~Debut, V.~Sanh, J.~Chaumond, C.~Delangue, A.~Moi, P.~Cistac,
+  T.~Rault, R.~Louf, M.~Funtowicz, J.~Davison, S.~Shleifer, P.~von Platen,
+  C.~Ma, Y.~Jernite, J.~Plu, C.~Xu, T.~L. Scao, S.~Gugger, M.~Drame, Q.~Lhoest,
+  and A.~M. Rush, ``Transformers: State-of-the-art natural language
+  processing,'' in \emph{Proceedings of the 2020 Conference on Empirical
+  Methods in Natural Language Processing: System Demonstrations}.\hskip 1em
+  plus 0.5em minus 0.4em\relax Online: Association for Computational
+  Linguistics, Oct. 2020, pp. 38--45. [Online]. Available:
+  \url{https://www.aclweb.org/anthology/2020.emnlp-demos.6}
+\BIBentrySTDinterwordspacing
+
 \end{thebibliography}

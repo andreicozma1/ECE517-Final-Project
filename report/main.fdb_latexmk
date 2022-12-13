@@ -1,14 +1,14 @@
 # Fdb version 3
-["bibtex main"] 1670966192 "main.aux" "main.bbl" "main" 1670966688
+["bibtex main"] 1670968951 "main.aux" "main.bbl" "main" 1670968984
   "./IEEEtran.bst" 1168508629 61632 1eded68932b68cdfaf04f54eba82634b ""
-  "main.aux" 1670966688 3892 617ff4b1daba7c2927586f1139f1fe4b "pdflatex"
+  "main.aux" 1670968984 4111 3ce5db13658f503da9aacad66f8d3652 "pdflatex"
   "main.bib" 1670960796 2483 3ff1a55f617e0796ff3b59b46618d7db ""
   (generated)
   "main.bbl"
   "main.blg"
-["pdflatex"] 1670966687 "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" "main.pdf" "main" 1670966688
+["pdflatex"] 1670968984 "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" "main.pdf" "main" 1670968984
   "/etc/texmf/web2c/texmf.cnf" 1666553428 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" 1670966687 25306 110937e9be273587ac9c50fc62a773c4 ""
+  "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" 1670968984 27407 98a72edc6558c9eb6f5ff8b7897d87ce ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/courier/pcrr7t.tfm" 1136768653 960 379cc0019370a9e0208a0a3f949f847a ""
@@ -123,10 +123,10 @@
   "img/acrobot-env.png" 1670963492 6413 4f04c65c24638d318ea53e76eb878abd ""
   "img/bipedal-walker-env.png" 1670963492 7403 7769703501e4f8c921fe5947a444dc91 ""
   "img/lunar-lander-env.png" 1670963492 6878 b2d51d760a8d85fd2d9f31f191c13909 ""
-  "main.aux" 1670966688 3892 617ff4b1daba7c2927586f1139f1fe4b "pdflatex"
-  "main.bbl" 1670966192 1463 d762ce26ff7e7142ab43c0408cdee126 "bibtex main"
-  "main.out" 1670966688 2180 a3574e464a31d48aa6c902b4b3987bba "pdflatex"
-  "main.tex" 1670966687 25306 110937e9be273587ac9c50fc62a773c4 ""
+  "main.aux" 1670968984 4111 3ce5db13658f503da9aacad66f8d3652 "pdflatex"
+  "main.bbl" 1670968951 2712 b2735e6a6a422c0f8981d72902532ccf "bibtex main"
+  "main.out" 1670968984 2180 a3574e464a31d48aa6c902b4b3987bba "pdflatex"
+  "main.tex" 1670968984 27407 98a72edc6558c9eb6f5ff8b7897d87ce ""
   (generated)
   "main.aux"
   "main.log"

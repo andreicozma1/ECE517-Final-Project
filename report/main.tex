@@ -306,7 +306,9 @@ The episode terminates if the agent's hull makes contact with the ground or if t
 \label{subsec:reinf-learning-methods}
 % PPO, Transformers, GPT
 
-
+% It will then feed the states and actions through linear layers to create state and action embeddings, and feed the 
+% timesteps through an embedding layer which generates positional embeddings. It adds the positional embeddings to the state and action embeddings. 
+% Then 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -393,8 +395,24 @@ any future api changes in the library. The file contains a class named PPO that 
 Our implementation is builds upon this class.
 
 This works implementation resides at \textbf{rllib/GPT2PPO.py}. This file contains the GPT2PPO class which implements the same interface as
-the reference PPO. 
+the reference PPO. Apart from the existing MLP, ActorContinuous, and ActorCategorical models used in the baseline PPO implementation that are  
+given by the Lighting-Bolts library, we use 2 additonal models that are implmented in the \textbf{rllib/CommonBase.py} file and 
+the \textbf{rllib/CommonGPT2.py} file.
 
+The \textbf{rllib/CommonBase.py} file implements the CommonBase class. This class implements a simple Sequential model containing a 
+Linear layer with a relu activation function followed by a Linear layer with no activation function. This class is used as the
+the base of the ActorCategorical and ActorContinuous models. States are fed through this and immediately given to the actor. 
+
+The \textbf{rllib/CommonGPT2.py} file implements the CommonGPT2 class. This class implements a usage of the GPT2 model which is stored 
+in the \textbf{rllib/GPT2.py} file. The GPT2 model is taken from the Decision Transformer implementation\cite{chen2021decision}. In that work
+the authors took the huggingface GPT2 model and removed the logic that implment positional embeddings\cite{radford2019language,wolf-etal-2020-transformers}.
+Our CommonGPT2 shares large similarities with the Decision Transformer implementation\cite{chen2021decision}; however, we chose to only 
+feed the states and actions to GPT2 rather than the states, actions, and rewards to go. As input, CommonGPT2 will take a history of timesteps, states, 
+and actions as input of shape (batch\_size, sequence\_length,:). It will then return an embedding of the state and action. The embedding of the 
+state is then fed to the critic and the critic predicts the value of the state. 
+
+GPT2PPO has some differences from the baseline PPO in how the internals are structured. Because we are using a Transformer we need to keep track of the 
+history of the states, actions, timesteps, 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
