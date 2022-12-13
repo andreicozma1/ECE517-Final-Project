@@ -453,6 +453,7 @@ We ran each model 3 times and averaged the results.
     \hline
     \textbf{Param} & \textbf{\textit{Value}} \\
     \hline
+        Environment Seed & 123 \\
         Epochs & 150 \\
         Gamma & 0.99 \\
         Lambda & 0.95 \\
@@ -502,7 +503,7 @@ We ran each model 3 times and averaged the results.
 
 
 %% GPT2PPO - Different Context Lengths
-
+% Context lengths of [25,50,75]
 \begin{figure}[htbp]
     \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-loss_critic-ctx_len.png}}
     \caption{Lunar Lander - GPT2PPO Context Length - Critic Loss}

@@ -1,14 +1,14 @@
 # Fdb version 3
-["bibtex main"] 1670971740 "main.aux" "main.bbl" "main" 1670971825
+["bibtex main"] 1670971740 "main.aux" "main.bbl" "main" 1670972070
   "./IEEEtran.bst" 1168508629 61632 1eded68932b68cdfaf04f54eba82634b ""
-  "main.aux" 1670971825 9172 d905d1ada2530cd6de0aef9e68e3e226 "pdflatex"
+  "main.aux" 1670972070 9172 d905d1ada2530cd6de0aef9e68e3e226 "pdflatex"
   "main.bib" 1670960796 2483 3ff1a55f617e0796ff3b59b46618d7db ""
   (generated)
   "main.bbl"
   "main.blg"
-["pdflatex"] 1670971824 "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" "main.pdf" "main" 1670971825
+["pdflatex"] 1670972070 "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" "main.pdf" "main" 1670972070
   "/etc/texmf/web2c/texmf.cnf" 1666553428 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" 1670971824 33077 e856928cff719f1201cfe90787d3d0f3 ""
+  "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" 1670972069 33142 e71886b51f493e945099c56e59cc1d49 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/courier/pcrr7t.tfm" 1136768653 960 379cc0019370a9e0208a0a3f949f847a ""
@@ -139,10 +139,10 @@
   "img/lunar-lander-loss_actor-model.png" 1670963492 136344 fa07d851415abb171cb09a8f411a786c ""
   "img/lunar-lander-loss_critic-ctx_len.png" 1670963492 80322 e77eab95e83247e38045f4e4f705b250 ""
   "img/lunar-lander-loss_critic-model.png" 1670963492 101441 5d88a7fe856378534bb80ab09083b683 ""
-  "main.aux" 1670971825 9172 d905d1ada2530cd6de0aef9e68e3e226 "pdflatex"
+  "main.aux" 1670972070 9172 d905d1ada2530cd6de0aef9e68e3e226 "pdflatex"
   "main.bbl" 1670971740 2712 b2735e6a6a422c0f8981d72902532ccf "bibtex main"
-  "main.out" 1670971825 2525 824f538487625a9c7cd2d9561ce55176 "pdflatex"
-  "main.tex" 1670971824 33077 e856928cff719f1201cfe90787d3d0f3 ""
+  "main.out" 1670972070 2525 824f538487625a9c7cd2d9561ce55176 "pdflatex"
+  "main.tex" 1670972069 33142 e71886b51f493e945099c56e59cc1d49 ""
   (generated)
   "main.aux"
   "main.log"
