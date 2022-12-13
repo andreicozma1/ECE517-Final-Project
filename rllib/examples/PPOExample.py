@@ -53,7 +53,7 @@ class PPO(LightningModule):
             lr_actor: float = 3e-4,
             lr_critic: float = 1e-3,
             max_episode_len: float = 500,
-            batch_size: int = 1024,
+            batch_size: int = 128,
             steps_per_epoch: int = 2048,
             nb_optim_iters: int = 5,
             clip_ratio: float = 0.2,
