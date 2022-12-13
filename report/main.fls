@@ -674,10 +674,11 @@ INPUT ./img/acrobot-env.png
 INPUT ./img/acrobot-env.png
 INPUT ./img/acrobot-env.png
 INPUT ./img/acrobot-env.png
-INPUT ./main.bbl
-INPUT main.bbl
-INPUT ./main.bbl
-INPUT main.bbl
+INPUT ./img/bipedal-walker-env.png
+INPUT ./img/bipedal-walker-env.png
+INPUT ./img/bipedal-walker-env.png
+INPUT ./img/bipedal-walker-env.png
+INPUT ./img/bipedal-walker-env.png
 INPUT /usr/share/texlive/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT /var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map
@@ -702,6 +703,10 @@ INPUT /usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmr8r.tfm
 INPUT /usr/share/texlive/texmf-dist/fonts/vf/adobe/times/ptmr7t.vf
+INPUT ./main.bbl
+INPUT main.bbl
+INPUT ./main.bbl
+INPUT main.bbl
 INPUT /usr/share/texlive/texmf-dist/fonts/vf/adobe/times/ptmri7t.vf
 INPUT /usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmri8r.tfm
 INPUT main.aux

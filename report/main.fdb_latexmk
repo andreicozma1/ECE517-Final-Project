@@ -1,14 +1,14 @@
 # Fdb version 3
-["bibtex main"] 1670959780 "main.aux" "main.bbl" "main" 1670959823
+["bibtex main"] 1670960304 "main.aux" "main.bbl" "main" 1670960496
   "./IEEEtran.bst" 1168508629 61632 1eded68932b68cdfaf04f54eba82634b ""
-  "main.aux" 1670959823 2936 7d27df038d661853b480939ce69ce2cb "pdflatex"
+  "main.aux" 1670960496 3164 44a87b452eaae7d54e9388dc0ac5500e "pdflatex"
   "main.bib" 1670958413 2309 defe4924fbcd78a3375937da22dd45c7 ""
   (generated)
   "main.bbl"
   "main.blg"
-["pdflatex"] 1670959823 "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" "main.pdf" "main" 1670959823
+["pdflatex"] 1670960496 "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" "main.pdf" "main" 1670960496
   "/etc/texmf/web2c/texmf.cnf" 1666553428 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" 1670959823 18746 ca437145a86880279e77a21e5c28e45c ""
+  "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" 1670960496 18254 3842c04daf2d09d2c74f097d0c46cb20 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1136768653 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -113,11 +113,12 @@
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1670953768 1435940 00645871ccdb4b9dc985d9931e7c7a1e ""
   "IEEEtran.cls" 1670956466 288304 b67b6fc6c2abb39f9b461923f5199343 ""
   "img/acrobot-env.png" 1670956514 6413 4f04c65c24638d318ea53e76eb878abd ""
+  "img/bipedal-walker-env.png" 1670959975 7403 7769703501e4f8c921fe5947a444dc91 ""
   "img/lunar-lander-env.png" 1670956514 6878 b2d51d760a8d85fd2d9f31f191c13909 ""
-  "main.aux" 1670959823 2936 7d27df038d661853b480939ce69ce2cb "pdflatex"
-  "main.bbl" 1670959780 1254 87bbac9ca22fa7cde89d5d8d966f7c6d "bibtex main"
-  "main.out" 1670959823 1590 22bab774fcb09f1b314e7130e3c841c3 "pdflatex"
-  "main.tex" 1670959823 18746 ca437145a86880279e77a21e5c28e45c ""
+  "main.aux" 1670960496 3164 44a87b452eaae7d54e9388dc0ac5500e "pdflatex"
+  "main.bbl" 1670960304 1254 87bbac9ca22fa7cde89d5d8d966f7c6d "bibtex main"
+  "main.out" 1670960496 1590 22bab774fcb09f1b314e7130e3c841c3 "pdflatex"
+  "main.tex" 1670960496 18254 3842c04daf2d09d2c74f097d0c46cb20 ""
   (generated)
   "main.aux"
   "main.log"
