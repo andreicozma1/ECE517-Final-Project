@@ -412,8 +412,17 @@ and actions as input of shape (batch\_size, sequence\_length,:). It will then re
 state is then fed to the critic and the critic predicts the value of the state. 
 
 GPT2PPO has some differences from the baseline PPO in how the internals are structured. Because we are using a Transformer we need to keep track of the 
-history of the states, actions, timesteps, 
+history of the states, actions, timesteps, and attention masks used by the model. We do this by storing each of the respective histories in a buffer
+of a length equal to the context length of the GPT2 model. When the buffer is full, the oldest entry is removed and the new entry is added to the end 
+of the buffer. The buffer is then fed to the GPT2 model and the most current state is fed through the CommonBase then the actor. The GPT2 model will 
+then return an embedding of the state and action. The embedding of the state is given to the critic. All inputs are saved in a history array which is 
+later used for training.
+There are two main functions for data generation and training. The \textbf{generate\_trajectory\_samples} function is used to generate data for training.
+It runs a configured number of timesteps then yields the model inputs, attention masks, actions, log probabilities, Q values, and Advantages for
+all timesteps. The \textbf{training\_step} function takes a batch of data and calculates and returns the loss for the actor or critic. This loss is 
+is used by the Pytorch-Lightning framework to update the actor or critic.
 
+% TODO probably more detail can be added.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -426,15 +435,153 @@ history of the states, actions, timesteps,
 
 
 \section{Results}
-% \label{sec:results}
+\label{sec:results}
+
+In this work we compare the results of our GPT2PPO model against the baseline PPO model. 
+We compare the results of both models on the Lunar Lander, Acrobot, and environments.
+To keep all of our results consistent, when comparing models we ran each model with the
+same hyperparemters for the same number of epochs.
+The hyperparameters for both models are listed in Table \ref{tab:hyperparameters}.
+We ran each model 3 times and averaged the results. 
+
+\begin{table}[htbp]
+    \caption{Model Hyperparameters}
+    \begin{center}
+    \begin{tabular}{|c|c|}
+    \hline
+        \multicolumn{2}{|c|}{\textbf{Hyperparameters}} \\
+    \hline
+    \textbf{Param} & \textbf{\textit{Value}} \\
+    \hline
+        Epochs & 150 \\
+        Gamma & 0.99 \\
+        Lambda & 0.95 \\
+        Batch Size & 128 \\
+        Actor Learning Rate & 3e-4 \\
+        Critic Learning Rate & 1e-3 \\
+        Max Episode Length & 500 \\
+        Steps Per Epoch & 2048 \\
+        Training Steps Per Epoch & 5 \\
+        Clip Ratio & 0.2 \\
+        Hidden Size & 64 \\
+        Context Length* & 64 \\
+    \hline
+    \multicolumn{2}{l}{*Context Length only used for GPT2PPO.}
+    \end{tabular}
+    \label{tab:hyperparameters}
+    \end{center}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Lunar Lander}
+
+%% PPO vs GPT2PPO - Comparison
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-loss_critic-model.png}}
+    \caption{Lunar Lander - PPO vs GPT2PPO - Critic Loss}
+    \label{lunar-lander-loss_critic-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-loss_actor-model.png}}
+    \caption{Lunar Lander - PPO vs GPT2PPO - Actor Loss}
+    \label{lunar-lander-loss_actor-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-avg_ep_reward-model.png}}
+    \caption{Lunar Lander - PPO vs GPT2PPO - Average Episode Reward}
+    \label{lunar-lander-avg_ep_reward-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-avg_ep_len-model.png}}
+    \caption{Lunar Lander - PPO vs GPT2PPO - Average Episode Length}
+    \label{lunar-lander-avg_ep_len-model}
+\end{figure}
 
 
-%\begin{figure}[htb]
-%    \centering
-%    \includegraphics[width=\columnwidth]{./img/q-vs-s-running-offline-reward.png}
-%    \caption{Q-learning vs. SARSA average offline reward.}
-%    \label{q-vs-s-running-offline-reward}
-%\end{figure}
+%% GPT2PPO - Different Context Lengths
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-loss_critic-ctx_len.png}}
+    \caption{Lunar Lander - GPT2PPO Context Length - Critic Loss}
+    \label{lunar-lander-loss_critic-ctx_len}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-loss_actor-ctx_len.png}}
+    \caption{Lunar Lander - GPT2PPO Context Length - Actor Loss}
+    \label{lunar-lander-loss_actor-ctx_len}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-avg_ep_reward-ctx_len.png}}
+    \caption{Lunar Lander - GPT2PPO Context Length - Average Episode Reward}
+    \label{lunar-lander-avg_ep_reward-ctx_len}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-avg_ep_len-ctx_len.png}}
+    \caption{Lunar Lander - GPT2PPO Context Length - Average Episode Length}
+    \label{lunar-lander-avg_ep_len-ctx_len}
+\end{figure}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Acrobot}
+
+%% PPO vs GPT2PPO - Comparison
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/acrobot-loss_critic-model.png}}
+    \caption{Acrobot - PPO vs GPT2PPO - Critic Loss}
+    \label{acrobot-loss_critic-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/acrobot-loss_actor-model.png}}
+    \caption{Acrobot - PPO vs GPT2PPO - Actor Loss}
+    \label{acrobot-loss_actor-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/acrobot-avg_ep_reward-model.png}}
+    \caption{Acrobot - PPO vs GPT2PPO - Average Episode Reward}
+    \label{acrobot-avg_ep_reward-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/acrobot-avg_ep_len-model.png}}
+    \caption{Acrobot - PPO vs GPT2PPO - Average Episode Length}
+    \label{acrobot-avg_ep_len-model}
+\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Bipedal Walker}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/bipedal-walker-loss_critic-model.png}}
+    \caption{Bipedal Walker - PPO vs GPT2PPO - Critic Loss}
+    \label{bipedal-walker-loss_critic-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/bipedal-walker-loss_actor-model.png}}
+    \caption{Bipedal Walker - PPO vs GPT2PPO - Actor Loss}
+    \label{bipedal-walker-loss_actor-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/bipedal-walker-avg_ep_reward-model.png}}
+    \caption{Bipedal Walker - PPO vs GPT2PPO - Average Episode Reward}
+    \label{bipedal-walker-avg_ep_reward-model}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centerline{\includegraphics[width=\columnwidth]{./img/bipedal-walker-avg_ep_len-model.png}}
+    \caption{Bipedal Walker - PPO vs GPT2PPO - Average Episode Length}
+    \label{bipedal-walker-avg_ep_len-model}
+\end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -467,16 +614,3 @@ history of the states, actions, timesteps,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \end{document}
-
-
-% This document was modified from the file originally made available by
-% Pat Langley and Andrea Danyluk for ICML-2K. This version was created
-% by Iain Murray in 2018, and modified by Alexandre Bouchard in
-% 2019 and 2021. Previous contributors include Dan Roy, Lise Getoor and Tobias
-% Scheffer, which was slightly modified from the 2010 version by
-% Thorsten Joachims & Johannes Fuernkranz, slightly modified from the
-% 2009 version by Kiri Wagstaff and Sam Roweis's 2008 version, which is
-% slightly modified from Prasad Tadepalli's 2007 version which is a
-% lightly changed version of the previous year's version by Andrew
-% Moore, which was in turn edited from those of Kristian Kersting and
-% Codrina Lauth. Alex Smola contributed to the algorithmic style files.
