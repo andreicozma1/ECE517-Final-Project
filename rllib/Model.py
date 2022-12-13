@@ -35,11 +35,12 @@ class Model:
         model_params = model_params or {}
         # setup model
         models = {
-            "ppo_ex": PPO,
-            "a2c_ex": AdvantageActorCritic,
-            "ppo_1" : PPO1,
-            "ppo_2" : PPO2,
-            "ppo_3" : PPO3,
+                "ppo_ex": PPO,
+                "a2c_ex": AdvantageActorCritic,
+                "ppo_1" : PPO1,
+                "ppo_2" : PPO2,
+                "ppo_3" : PPO3,
+                "ppo_4" : PPO3,
         }
         if model_name not in models:
             print(f"ERROR: Model {model_name} not supported")
@@ -94,7 +95,7 @@ class Model:
             next_state, value, reward, done = None, None, None, None
             # api for models are a bit different for getting state and value
             if "ppo_3" in self.name:
-                next_state, reward, done  = self.model.eval_step()
+                next_state, reward, done = self.model.eval_step()
             elif "ppo" in self.name:
                 with torch.no_grad():
                     pi, action, value = self.model(state)
@@ -150,10 +151,11 @@ class Model:
             raise ValueError("Model hasn't been created/loaded")
         if wandb_entity == "":
             self.loggers.append(WandbLogger(project=wandb_project, name=self.model_hash,
-                                        group=self.name, tags=["train"]))
+                                            group=self.name, tags=["train"]))
         else:
             self.loggers.append(WandbLogger(project=wandb_project, name=self.model_hash, entity=wandb_entity,
                                             group=self.name, tags=["train"]))
+
     def create_csv_logger(self, log_dir):
         log_dir = log_dir.strip()
         if self.model_hash is None:
