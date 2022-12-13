@@ -29,29 +29,7 @@ else:  # pragma: no cover
 os.environ['WANDB_SILENT'] = "true"
 
 
-class PPO3(LightningModule):
-    """PyTorch Lightning implementation of `Proximal Policy Optimization.
-
-    <https://arxiv.org/abs/1707.06347>`_
-
-    Paper authors: John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov
-
-    Model implemented by:
-        `Sidhant Sundrani <https://github.com/sid-sundrani>`_
-
-    Example:
-        >>> from pl_bolts.models.rl.ppo_model import PPO
-        >>> model = PPO("CartPole-v0")
-
-    Note:
-        This example is based on OpenAI's
-        `PPO <https://github.com/openai/spinningup/blob/master/spinup/algos/pytorch/ppo/ppo.py>`_ and
-        `PPO2 <https://github.com/openai/baselines/blob/master/baselines/ppo2/ppo2.py>`_.
-
-    Note:
-        Currently only supports CPU and single GPU training with ``accelerator=dp``
-    """
-
+class GPT2PPO(LightningModule):
     def __init__(
             self,
             env: str,
@@ -80,6 +58,7 @@ class PPO3(LightningModule):
             steps_per_epoch: how many action-state pairs to rollout for trajectory collection per epoch
             nb_optim_iters: how many steps of gradient descent to perform on each batch
             clip_ratio: hyperparameter for clipping in the policy objective
+            ctx_len:
         """
         super().__init__()
 

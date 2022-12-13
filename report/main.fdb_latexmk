@@ -1,14 +1,14 @@
 # Fdb version 3
-["bibtex main"] 1670963184 "main.aux" "main.bbl" "main" 1670963187
+["bibtex main"] 1670963916 "main.aux" "main.bbl" "main" 1670963990
   "./IEEEtran.bst" 1168508629 61632 1eded68932b68cdfaf04f54eba82634b ""
-  "main.aux" 1670963187 3404 127a8abd5ade2054cbdfffeefbb60118 "pdflatex"
+  "main.aux" 1670963990 4086 7166fbd0be0eb3932a581aa103414506 "pdflatex"
   "main.bib" 1670960796 2483 3ff1a55f617e0796ff3b59b46618d7db ""
   (generated)
   "main.bbl"
   "main.blg"
-["pdflatex"] 1670963186 "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" "main.pdf" "main" 1670963187
+["pdflatex"] 1670963989 "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" "main.pdf" "main" 1670963990
   "/etc/texmf/web2c/texmf.cnf" 1666553428 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" 1670963186 20855 e89c05da95747cacc57af637626f664b ""
+  "/home/hp/github/classes/ece517/projects/ECE517-Final-Project/report/main.tex" 1670963989 21900 6d52fd625d615846be4c6e7a29666157 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1136768653 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -112,13 +112,13 @@
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1670953765 165012 f177baa1c39a3ebd62c3096a43521a0d ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1670953768 1435940 00645871ccdb4b9dc985d9931e7c7a1e ""
   "IEEEtran.cls" 1670956466 288304 b67b6fc6c2abb39f9b461923f5199343 ""
-  "img/acrobot-env.png" 1670956514 6413 4f04c65c24638d318ea53e76eb878abd ""
-  "img/bipedal-walker-env.png" 1670959975 7403 7769703501e4f8c921fe5947a444dc91 ""
-  "img/lunar-lander-env.png" 1670956514 6878 b2d51d760a8d85fd2d9f31f191c13909 ""
-  "main.aux" 1670963187 3404 127a8abd5ade2054cbdfffeefbb60118 "pdflatex"
-  "main.bbl" 1670963184 1234 fdc88a7645081d2d8068ae28df2c2a11 "bibtex main"
-  "main.out" 1670963187 1874 9116da07d3e2105420f19d463a080141 "pdflatex"
-  "main.tex" 1670963186 20855 e89c05da95747cacc57af637626f664b ""
+  "img/acrobot-env.png" 1670963492 6413 4f04c65c24638d318ea53e76eb878abd ""
+  "img/bipedal-walker-env.png" 1670963492 7403 7769703501e4f8c921fe5947a444dc91 ""
+  "img/lunar-lander-env.png" 1670963492 6878 b2d51d760a8d85fd2d9f31f191c13909 ""
+  "main.aux" 1670963990 4086 7166fbd0be0eb3932a581aa103414506 "pdflatex"
+  "main.bbl" 1670963916 1234 fdc88a7645081d2d8068ae28df2c2a11 "bibtex main"
+  "main.out" 1670963990 2432 9ba5350eebb36b9af0ec08fedbcaab3a "pdflatex"
+  "main.tex" 1670963989 21900 6d52fd625d615846be4c6e7a29666157 ""
   (generated)
   "main.aux"
   "main.log"

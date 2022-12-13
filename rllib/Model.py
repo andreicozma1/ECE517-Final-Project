@@ -12,7 +12,8 @@ from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
 from rllib.PPO1 import PPO1
 from rllib.PPO2 import PPO2
-from rllib.PPO3 import PPO3
+from rllib.PPO4 import PPO4
+from rllib.GPT2PPO import GPT2PPO
 from rllib.Utils import discount_rewards
 from rllib.examples.A2CExample import AdvantageActorCritic
 from rllib.examples.PPOExample import PPO
@@ -39,8 +40,8 @@ class Model:
                 "a2c_ex": AdvantageActorCritic,
                 "ppo_1" : PPO1,
                 "ppo_2" : PPO2,
-                "ppo_3" : PPO3,
-                "ppo_4" : PPO3,
+                "ppo_gpt" : GPT2PPO,
+                "ppo_4" : PPO4,
         }
         if model_name not in models:
             print(f"ERROR: Model {model_name} not supported")
@@ -88,13 +89,13 @@ class Model:
         pred_value = []
         hist_rewards = []
         print(self.name)
-        if 'ppo_3' in self.name:
+        if 'ppo_gpt' in self.name:
             self.model.eval_start()
         while not done:
             state = state.to(device=self.model.device)
             next_state, value, reward, done = None, None, None, None
             # api for models are a bit different for getting state and value
-            if "ppo_3" in self.name:
+            if "ppo_gpt" in self.name:
                 next_state, reward, done = self.model.eval_step()
             elif "ppo" in self.name:
                 with torch.no_grad():
