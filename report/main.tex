@@ -32,7 +32,7 @@
 \begin{document}
 
 \twocolumn[
-    \icmltitle{GPT2PPO: A blah blah blah}
+    \icmltitle{GPT2PPO: Auto Regressive Proximal Policy Optimization}
 
     % It is OKAY to include author information, even for blind
     % submissions: the style file will automatically remove it for you
@@ -162,10 +162,11 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% PROJECT OVERVIEW:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% The goal of this project is to experiment using Q-learning to beat a Pong game program.
-% This will include programming the Q-learner, choosing hyper parameters, and quantizing the
-% state. The assignment comprises of writing a Python-based simulation, and then a report
-% which analyzes and explains the results.
+% The goal of this project is for you to further explore a certain subject that we covered
+% in class or a new subject related to it (based on some previous work). This is an open
+% project in a sense that you will propose the problem you would like to work on and the
+% solution you are planning use. Your main goal should be to explore the characteristics of
+% your problem/solution under the reinforcement learning framework
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -209,19 +210,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% NOTE - Moved the abstract to introduction bc we dont really need one
-
-%\begin{abstract}
-%    In this project, we explore the use of two popular Reinforcement Learning
-%    algorithms, Q-learning and SARSA, to play the game of Pong.
-%    We compare the performance of these algorithms and analyze their behavior
-%    in different learning scenarios through a series of experiments.
-%    We also discuss the effect of hyperparameters on the performance of the algorithms.
-%    Finally, we analyze the results and discuss the performance of the algorithms
-%    through a variety of metrics collected during the experiments.
-%\end{abstract}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -232,7 +220,14 @@
 
 \section{Introduction}
 \label{sec:introduction}
-\lipsum[2-4]
+In this project we explore the use of transformers in the context of Reinforcement Learning. The majority of theoretical works 
+assume that problems follow a Markovian process, which is not always the case. Some problems need the contxt of previous states and actions
+to make an informed decision on the next decision. As a result, we propose an addition to the basic Proximal Policy Optimization (PPO) algorithm
+by using the Generative Pre-trained Transformer 2 (GPT2) model as the encoder for the critic network. This will allow the critic network to
+take into account the context of previous states and actions as well as apply attention to past states and actions that may be important. 
+We will test this model on the LunarLander-v2 and Acrobot-v1 OpenAi Gym environments with discrete action spaces and compare it to the original PPO algorithm. 
+Additionally we will test the model on BipedalWalker-v3 with continuous action spaces and compare it to the original PPO algorithm.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -245,7 +240,11 @@
 
 \section{Previous Work}
 \label{sec:previous-work}
-\lipsum[2-4]
+
+% PPO citation - \cite{schulman2017proximal}
+% Decision Transformer citation - \cite{chen2021decision}
+% GPT2 citation - \cite{radford2019language}
+% Wandb citation - \cite{wandb}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -258,10 +257,35 @@
 \section{Background}
 \label{sec:background}
 
-\subsection{Lunar Lander}
-\lipsum[1-2]
+All of the environments used in this project are from the OpenAI Gym library \cite{brockman2016openai}. The environments are described below.
+
 \subsection{Lunar Lander}
 
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=\columnwidth]{./img/lunar-lander-env.png}
+    \caption{The Lunar Lander environment.}
+    \label{lunar-lander-env}
+\end{figure}
+
+\subsection{Acrobot}
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=\columnwidth]{./img/lunar-lander-env.png}
+    \caption{The Acrobot environment.}
+    \label{acrobot-env}
+\end{figure}
+
+\subsection{Bipedal Walker}
+
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=\columnwidth]{./img/bipedal-walker-env.png}
+    \caption{The Bipedal Walker environment.}
+    \label{bipedal-walker-env}
+\end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
