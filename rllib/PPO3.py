@@ -57,8 +57,8 @@ class PPO3(LightningModule):
             env: str,
             gamma: float = 0.99,
             lam: float = 0.95,
-            lr_actor: float = 0.0003,
-            lr_critic: float = 0.0005,
+            lr_actor: float = 3e-4,
+            lr_critic: float = 1e-3,
             max_episode_len: int = 500,
             batch_size: int = 128,
             steps_per_epoch: int = 2048,
@@ -178,7 +178,7 @@ class PPO3(LightningModule):
     def add_state(self, next_state):
         next_state = torch.from_numpy(next_state).to(self.device)
         next_state = torch.reshape(next_state, (1, -1))
-        self.states = torch.cat((self.states[1:], next_state)) # MARK
+        self.states = torch.cat((self.states[1:], next_state))
 
     def add_action(self, pi, action):
         log_probs = torch.reshape(pi.probs, (1, -1))

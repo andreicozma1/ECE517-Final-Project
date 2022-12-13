@@ -23,7 +23,6 @@ class CommonGPT2(nn.Module):
             hidden_size: size of hidden layers
         """
         super().__init__()
-        print(kwargs)
         self.n_states = n_states
         self.n_actions = n_actions
         self.out_features = out_features
@@ -32,15 +31,14 @@ class CommonGPT2(nn.Module):
         self.hidden_size = hidden_size
 
         self.n_layer = kwargs.get("n_layer", 2)
-        self.n_head = kwargs.get("n_head", 8)
+        self.n_head = kwargs.get("n_head", int(self.hidden_size//8))
         self.activation_function = kwargs.get("activation_function", "gelu")
-        self.dropout = kwargs.get("dropout", 0.5)
+        self.dropout = kwargs.get("dropout", 0.5)  # 0.1
         self.n_positions = kwargs.get("n_positions", 1024)
         # Using extra padding token (-1) to avoid confusion with 0 (which is a valid timestep)
         self.emb_p = nn.Embedding(max_episode_len, hidden_size)
         self.emb_s = nn.Linear(n_states, hidden_size)
         self.emb_a = nn.Linear(n_actions, hidden_size)
-        self.emb_r = nn.Linear(1, hidden_size)
         self.embed_ln = nn.LayerNorm(hidden_size)
 
         config = transformers.GPT2Config(
@@ -48,7 +46,7 @@ class CommonGPT2(nn.Module):
             n_embd=hidden_size,
             n_layer=self.n_layer,
             n_head=self.n_head,
-            n_inner=4*hidden_size,
+            n_inner=4*self.hidden_size,
             activation_function=self.activation_function,
             n_positions=self.n_positions,
             resid_pdrop=self.dropout,
@@ -111,11 +109,11 @@ class CommonGPT2(nn.Module):
         state_embeddings = state_embeddings + time_embeddings
         action_embeddings = action_embeddings + time_embeddings
 
+        # s1, a1, s2, a2, s3, a3, s4, a4, s5, a5
         stacked_inputs = torch.stack(
                 (state_embeddings, action_embeddings), dim=1
         ).permute(0, 2, 1, 3).reshape(batch_size, 2 * seq_length, self.hidden_size)
         stacked_inputs = self.embed_ln(stacked_inputs)
-
 
         stacked_attention_mask = torch.stack(
                 (attention_mask, attention_mask), dim=1
@@ -135,7 +133,6 @@ class CommonGPT2(nn.Module):
         # state and action x[:,1] is the output of the transformer
         state_pred = x[:,0]  # only state
         state_action_pred = x[:,1]  # state and action
-
 
         # slice last prediction
         state_pred = state_pred[:, -1]
