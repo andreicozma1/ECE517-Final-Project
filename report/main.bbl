@@ -21,13 +21,12 @@
 \providecommand{\BIBdecl}{\relax}
 \BIBdecl
 
-\bibitem{schulman2017proximal}
-J.~Schulman, F.~Wolski, P.~Dhariwal, A.~Radford, and O.~Klimov, ``Proximal
-  policy optimization algorithms,'' \emph{arXiv preprint arXiv:1707.06347},
-  2017.
-
 \bibitem{brockman2016openai}
 G.~Brockman, V.~Cheung, L.~Pettersson, J.~Schneider, J.~Schulman, J.~Tang, and
   W.~Zaremba, ``Openai gym,'' \emph{arXiv preprint arXiv:1606.01540}, 2016.
+
+\bibitem{sutton2018reinforcement}
+R.~S. Sutton and A.~G. Barto, \emph{Reinforcement learning: An
+  introduction}.\hskip 1em plus 0.5em minus 0.4em\relax MIT press, 2018.
 
 \end{thebibliography}

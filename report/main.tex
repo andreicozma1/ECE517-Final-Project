@@ -206,7 +206,7 @@ Additionally we will test the model on BipedalWalker-v3 with continuous action s
 \section{Previous Work}
 % \label{sec:previous-work}
 
-PPO citation - \cite{schulman2017proximal}
+% PPO citation - \cite{schulman2017proximal}
 % Decision Transformer citation - \cite{chen2021decision}
 % GPT2 citation - \cite{radford2019language}
 % Wandb citation - \cite{wandb}
@@ -223,15 +223,15 @@ PPO citation - \cite{schulman2017proximal}
 \section{Background}
 % \label{sec:background}
 
-All of the environments used in this project are from the OpenAI Gym library \cite{brockman2016openai}. The environments are described below.
+All of the environments used in this project are from the OpenAI Gym library\cite{brockman2016openai}. The environments are described below.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Lunar Lander}
 
 The Lunar Lander environment is a rocket trajectory optimization  
 problem\footnote{OpenAI Gym Lunar Lander: \url{https://www.gymlibrary.dev/environments/box2d/lunar_lander}}
-shown in Figure \ref{fig:lunar-lander-env}.
-The OpenAI Gym offers two versions of the environment: discrete or continuous.
+shown in Figure \ref{fig:lunar-lander-env}. The goal is to actuate the lander to the landing pad at coordinates (0,0) without crashing.
+OpenAI Gym offers two versions of the environment: discrete or continuous.
 In this work we only use the discrete version. 
 The state space is a 8-dimensional vector containing the x and y positional coordinates of the agent, its x and y linear velocities,
 its angle, its angular velocity, and two booleans that represent whether each leg is in contact with the ground or not.
@@ -243,7 +243,6 @@ Firing the main engine is -0.3 points each frame. Firing the side engine is -0.0
 The landers initial state is at the top center of the environment with a random intial force applied to its center. 
 The episode ends if the lander crashes, goes outside of the viewport, or comes to a resting position.
 
-
 \begin{figure}[htbp]
     \centerline{\includegraphics[width=\columnwidth]{./img/lunar-lander-env.png}}
     \caption{The Lunar Lander environment.}
@@ -253,19 +252,29 @@ The episode ends if the lander crashes, goes outside of the viewport, or comes t
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Acrobot}
-\footnote{OpenAI Gym Acrobot: \url{https://www.gymlibrary.dev/environments/classic_control/acrobot}}.
 
-The Acrobot environment 
+Open AI Gym's implementation of the Acrobot 
+environment\footnote{OpenAI Gym Acrobot: \url{https://www.gymlibrary.dev/environments/classic_control/acrobot}}
+is based off the work of Sutton and Barto\cite{sutton2018reinforcement} shown in Figure \ref{fig:acrobot-env}.
+The environment is a 2-link pendulum with only the second joint actuated with a discrete action space. The goal is to swing the end of the pendulum up to a given height. 
+The state space is a 6-dimensional vector containing the sin and cos of the two joint angles and the joint angular velocities.
+The action space is a single discrete scalar with values ranging from 0 to 5. The values corresponspond to the following actions:
+apply +1, 0, or -1 torque to the actuated joint. 
+The reward structure contains only negative rewards. At each timestep the agent receives a reward of -1 for each step that does not reach the goal.
+If the goal is reached the agent receives a reward of 0. The episode ends if the agent reaches the goal height or if the episode exceeds the maximum number of timesteps.
+
 \begin{figure}[htbp]
     \centerline{\includegraphics[width=\columnwidth]{./img/acrobot-env.png}}
     \caption{The Acrobot environment.}
-    \label{acrobot-env}
+    \label{fig:acrobot-env}
 \end{figure}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Bipedal Walker}
-\footnote{OpenAI Gym Acrobot: \url{https://www.gymlibrary.dev/environments/box2d/bipedal_walker}}.
 
+The Bipedal Walker environment is a 2D simulation of a bipedal walker with 
+4-joints\footnote{OpenAI Gym Acrobot: \url{https://www.gymlibrary.dev/environments/box2d/bipedal_walker}} 
+shown in Figure \ref{bipedal-walker-env}.
 \begin{figure}[htbp]
     \centerline{\includegraphics[width=\columnwidth]{./img/bipedal-walker-env.png}}
     \caption{The Bipedal Walker environment.}
