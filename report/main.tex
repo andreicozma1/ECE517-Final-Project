@@ -271,10 +271,19 @@ If the goal is reached the agent receives a reward of 0. The episode ends if the
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Bipedal Walker}
-
-The Bipedal Walker environment is a 2D simulation of a bipedal walker with 
+%. There are no coordinates in the state vector.
+The Bipedal Walker environment is a 2D simulation of a bipedal walker robot with 
 4-joints\footnote{OpenAI Gym Acrobot: \url{https://www.gymlibrary.dev/environments/box2d/bipedal_walker}} 
-shown in Figure \ref{bipedal-walker-env}.
+shown in Figure \ref{bipedal-walker-env}. The goal is to keep the walker upright for as long as possible.
+The state space is a 24-dimensional vector containing: 
+the hull angle speed, angular velocity, horizontal speed, vertical speed, position of joints and joints angular speed, 
+legs contact with ground, and 10 lidar rangefinder measurements. Notably, there are no coordinates given in the state vector.
+The action space is a 4 dimensional vector containing continuous values of each joints motor speed between -1 and 1.
+The reward structure contains both positive and negative rewards. A positive reward is given for moving forward. If the agent falls it receives a reward of -100.
+Applying motor torque costs a small amount of reward.
+The agent's intial state is standing at the left of the terrain with the hull horizontal, with both legs in the same position with a slight knee angle. 
+The episode terminates if the agent's hull makes contact with the ground or if the agent reaches the end of the terrain length.
+
 \begin{figure}[htbp]
     \centerline{\includegraphics[width=\columnwidth]{./img/bipedal-walker-env.png}}
     \caption{The Bipedal Walker environment.}
@@ -354,12 +363,22 @@ shown in Figure \ref{bipedal-walker-env}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% In the unusual situation where you want a paper to appear in the
-% references without citing it in the main text, use \nocite
+% References
 \bibliographystyle{IEEEtran}
 \bibliography{main}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% An appendix describing which part of the project each team member was in charge of.
+\appendix
+\subsection{Team Member Contributions}
+
+\textbf{Andrei Cozma}. text here.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\textbf{Hunter Price}. text here.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
