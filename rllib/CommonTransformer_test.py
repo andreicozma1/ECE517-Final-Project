@@ -10,12 +10,16 @@ from torch.nn import Transformer
 class CommonTransformer(nn.Module):
     """Simple MLP network."""
 
-    def __init__(self, n_states: int, n_actions: int,
-                 out_features: int,
-                 max_episode_len: int,
-                 batch_size: int,
-                 seq_len: int,
-                 hidden_size: int = 64):
+    def __init__(
+        self,
+        n_states: int,
+        n_actions: int,
+        out_features: int,
+        max_episode_len: int,
+        batch_size: int,
+        seq_len: int,
+        hidden_size: int = 64,
+    ):
         """
         Args:
             n_states: observation shape of the environment
@@ -34,16 +38,16 @@ class CommonTransformer(nn.Module):
         self.emb_t = nn.Embedding(max_episode_len + 1, hidden_size)
         self.emb_s = nn.Linear(n_states, hidden_size)
         self.emb_a = nn.Linear(n_actions, hidden_size)
-        # TODO: Currently not used:
-        self.emb_r = nn.Linear(n_actions, hidden_size)
 
-        self.transformer_encoder = nn.TransformerEncoderLayer(d_model=hidden_size,
-                                                              nhead=hidden_size // 8,
-                                                              dim_feedforward=2048,
-                                                              dropout=0.1,
-                                                              activation="gelu",
-                                                              batch_first=True,
-                                                              norm_first=True)
+        self.transformer_encoder = nn.TransformerEncoderLayer(
+            d_model=hidden_size,
+            nhead=hidden_size // 8,
+            dim_feedforward=2048,
+            dropout=0.1,
+            activation="gelu",
+            batch_first=True,
+            norm_first=True,
+        )
         self.transformer = nn.TransformerEncoder(self.transformer_encoder, num_layers=2)
         # self.transformer: Transformer = nn.Transformer(d_model=hidden_size,
         #                                                nhead=hidden_size // 8,
@@ -55,20 +59,18 @@ class CommonTransformer(nn.Module):
         #                                                batch_first=True,
         #                                                norm_first=True
         #                                                )
-        # TODO: I got Comv1d to sorta work but not sure if it's proper way to do it.
-        # self.pool = nn.AvgPool1d(self.seq_len)
         self.conv = nn.Conv1d(self.seq_len, 1, 1)
 
         self.fc = nn.Sequential(
-                nn.Linear(hidden_size, hidden_size),
-                nn.ReLU(),
-                nn.Linear(hidden_size, out_features),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, out_features),
         )
 
     def create_pad_mask(self, matrix: torch.tensor, pad_token: int) -> torch.tensor:
         # If matrix = [1,2,3,0,0,0] where pad_token=0, the result mask is
         # [False, False, False, True, True, True]
-        return (matrix == pad_token)
+        return matrix == pad_token
 
     def forward(self, input_x, training: bool):
         times, states, actions = input_x
@@ -160,9 +162,12 @@ class CommonTransformer(nn.Module):
         #                              src_key_padding_mask=trans_src_pad)
         ######################################
         # This is for transformer encoder only
-        trans_out = self.transformer(src=trans_inp,
-                                     src_key_padding_mask=Transformer.generate_square_subsequent_mask(self.seq_len,
-                                                                                                      device="cuda"))
+        trans_out = self.transformer(
+            src=trans_inp,
+            src_key_padding_mask=Transformer.generate_square_subsequent_mask(
+                self.seq_len, device="cuda"
+            ),
+        )
         # print("trans_out.shape", trans_out.shape)
         ###############################################################################
 

@@ -524,7 +524,7 @@ Overall, we have learned about the inner workings of PPO and that applying atten
 \subsection{Team Member Contributions}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\textbf{Andrei Cozma}. text here.
+\textbf{Andrei Cozma} contributed to the overall project with a working implementation of simple transformer encoder to be used as a common network for a baseline A2C implementation. Since A2C and PPO are similar in that they utilize actor and critic heads to predict the optimal policy and value function, respectively, he integrated it into the PPO implementation from the Lightning-Bolts library, which already provided functionality for creating batches of trajectories into an experience dataset. This provided us with a starting point for using one of the transformer models from HuggingFace as a swap-in replacement to the initial transformer model that was used for implementation testing. He also worked with Hunter to set up the rest of the training and evaluation framework in PyTorch and the pipeline for data collection and visualization of the results. He ran many variations of the initial PPO implementation with the simple transformer to better understand the sequence model's behaviors under different conditions. This was useful in determining the best ways we can integrate the final GPT2 model into the PPO algorithm. Finally, he worked with Hunter to write the final report.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
