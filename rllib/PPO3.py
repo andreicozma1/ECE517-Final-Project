@@ -31,7 +31,7 @@ else:  # pragma: no cover
 os.environ['WANDB_SILENT'] = "true"
 
 
-class PPO4(LightningModule):
+class PPO3(LightningModule):
     """PyTorch Lightning implementation of `Proximal Policy Optimization.
 
     <https://arxiv.org/abs/1707.06347>`_
