@@ -29,6 +29,18 @@ G.~Brockman, V.~Cheung, L.~Pettersson, J.~Schneider, J.~Schulman, J.~Tang, and
 R.~S. Sutton and A.~G. Barto, \emph{Reinforcement learning: An
   introduction}.\hskip 1em plus 0.5em minus 0.4em\relax MIT press, 2018.
 
+\bibitem{schulman2017proximal}
+J.~Schulman, F.~Wolski, P.~Dhariwal, A.~Radford, and O.~Klimov, ``Proximal
+  policy optimization algorithms,'' \emph{arXiv preprint arXiv:1707.06347},
+  2017.
+
+\bibitem{attentionisallyouneed}
+\BIBentryALTinterwordspacing
+A.~Vaswani, N.~Shazeer, N.~Parmar, J.~Uszkoreit, L.~Jones, A.~N. Gomez,
+  L.~Kaiser, and I.~Polosukhin, ``Attention is all you need,'' 2017. [Online].
+  Available: \url{https://arxiv.org/abs/1706.03762}
+\BIBentrySTDinterwordspacing
+
 \bibitem{wandb}
 \BIBentryALTinterwordspacing
 L.~Biewald, ``Experiment tracking with weights and biases,'' 2020, software
