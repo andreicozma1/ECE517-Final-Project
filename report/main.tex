@@ -1,84 +1,4 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% EXAMPLES:
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% EXAMPLE FIGURE:
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \begin{figure}[ht]
-%     \vskip 0.2in
-%     \begin{center}
-%         \centerline{\includegraphics[width=\columnwidth]{icml_numpapers}}
-%         \caption{Historical locations and number of accepted papers for International
-%             Machine Learning Conferences (ICML 1993 -- ICML 2008) and International
-%             Workshops on Machine Learning (ML 1988 -- ML 1992). At the time this figure was
-%             produced, the number of accepted papers for ICML 2008 was unknown and instead
-%             estimated.}
-%         \label{icml-historical}
-%     \end{center}
-%     \vskip -0.2in
-% \end{figure}
-%
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% EXAMPLE ALGORITHM:
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \begin{algorithm}[tb]
-%     \caption{Bubble Sort}
-%     \label{alg:example}
-%     \begin{algorithmic}
-%         \STATE {\bfseries Input:} data $x_i$, size $m$
-%         \REPEAT
-%         \STATE Initialize $noChange = true$.
-%         \FOR{$i=1$ {\bfseries to} $m-1$}
-%         \IF{$x_i > x_{i+1}$}
-%         \STATE Swap $x_i$ and $x_{i+1}$
-%         \STATE $noChange = false$
-%         \ENDIF
-%         \ENDFOR
-%         \UNTIL{$noChange$ is $true$}
-%     \end{algorithmic}
-% \end{algorithm}
-%
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% EXAMPLE TABLE:
-% Note use of \abovespace and \belowspace to get reasonable spacing
-% above and below tabular lines.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \begin{table}[t]
-%     \caption{Classification accuracies for naive Bayes and flexible
-%         Bayes on various data sets.}
-%     \label{sample-table}
-%     \vskip 0.15in
-%     \begin{center}
-%         \begin{small}
-%             \begin{sc}
-%                 \begin{tabular}{lcccr}
-%                     \toprule
-%                     Data set  & Naive         & Flexible      & Better?  \\
-%                     \midrule
-%                     Breast    & 95.9$\pm$ 0.2 & 96.7$\pm$ 0.2 & $\surd$  \\
-%                     Cleveland & 83.3$\pm$ 0.6 & 80.0$\pm$ 0.6 & $\times$ \\
-%                     Glass2    & 61.9$\pm$ 1.4 & 83.8$\pm$ 0.7 & $\surd$  \\
-%                     Credit    & 74.8$\pm$ 0.5 & 78.3$\pm$ 0.6 &          \\
-%                     Horse     & 73.3$\pm$ 0.9 & 69.7$\pm$ 1.0 & $\times$ \\
-%                     Meta      & 67.1$\pm$ 0.6 & 76.5$\pm$ 0.5 & $\surd$  \\
-%                     Pima      & 75.1$\pm$ 0.6 & 73.9$\pm$ 0.5 &          \\
-%                     Vehicle   & 44.9$\pm$ 0.6 & 61.5$\pm$ 0.4 & $\surd$  \\
-%                     \bottomrule
-%                 \end{tabular}
-%             \end{sc}
-%         \end{small}
-%     \end{center}
-%     \vskip -0.1in
-% \end{table}
-%
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% PROJECT OVERVIEW:
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % The goal of this project is for you to further explore a certain subject that we covered
@@ -166,15 +86,15 @@
 \maketitle
 
 
-\begin{abstract}
-    This document is a model and instructions for \LaTeX.
-    This and the IEEEtran.cls file define the components of your paper [title, text, heads, etc.]. *CRITICAL: Do Not Use Symbols, Special Characters, Footnotes,
-    or Math in Paper Title or Abstract.
-\end{abstract}
+% \begin{abstract}
+%     This document is a model and instructions for \LaTeX.
+%     This and the IEEEtran.cls file define the components of your paper [title, text, heads, etc.]. *CRITICAL: Do Not Use Symbols, Special Characters, Footnotes,
+%     or Math in Paper Title or Abstract.
+% \end{abstract}
 
-\begin{IEEEkeywords}
-    Reinforcement Learning, PPO, GPT2
-\end{IEEEkeywords}
+% \begin{IEEEkeywords}
+%     Reinforcement Learning, PPO, GPT2
+% \end{IEEEkeywords}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -184,9 +104,7 @@
 %what your new contribution is (as opposed to previous works).
 
 \section{Introduction}
-% \label{sec:introduction}
-In this project, we explore the use of transformers in the context of Reinforcement Learning. The majority of theoretical works assume that problems follow a Markovian process, which is not always the case. Some problems need the context of previous states and actions to make an informed decision about the next action to take. As a result, we propose an addition to the basic Proximal Policy Optimization (PPO) algorithm by using the Generative Pre-trained Transformer 2 (GPT2) model as the encoder for the critic network. This will allow the critic network to take into account the context of previous states and actions as well as apply attention to past states and actions that may be important. We will test this model on the LunarLander-v2 and Acrobot-v1 OpenAI Gym environments with discrete action spaces and compare it to the original PPO algorithm. Additionally, we will test the model on BipedalWalker-v3 with continuous action spaces and compare it to the original PPO algorithm.
-
+In this project, we explore the use of transformers in the context of Reinforcement Learning. Most theoretical works assume that problems follow a Markovian process, which is not always the case. Some problems need the context of previous states and actions to make an informed decision on the next action to take. As a result, we propose an addition to the basic Proximal Policy Optimization (PPO) algorithm by using the Generative Pre-trained Transformer 2 (GPT2) model as the encoder for the critic network. This will allow the critic network to take into account the context of previous states and actions as well as apply attention to past states and actions that may be important. We will test this model on the LunarLander-v2 and Acrobot-v1 OpenAI Gym environments with discrete action spaces and compare it to the original PPO algorithm. Additionally, we will test the model on BipedalWalker-v3 with continuous action spaces and compare it to the original PPO algorithm.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -198,26 +116,12 @@ In this project, we explore the use of transformers in the context of Reinforcem
 %all sources.
 
 \section{Previous Work}
-% \label{sec:previous-work}
 
-In reinforcement learning, there have been many approaches that have become dominant in the field which we have based our work upon.
-The first of which is the Advantage Actor Critic (A2C) Model \cite{mnih2016asynchronous}. This model uses two different models for the actor and critic that are used respectively to estimate
-an optimal policy and estimate the value function. On a prediction, the model computes the advantage function which is used when calculating the loss.
-The next work named Proximal Policy Optimization (PPO) builds upon A2C \cite{schulman2017proximal}. It uses a similar architecture with an actor and a critic,
-but implements clip loss for the actor loss which takes the minimum of the ratio of new and old log probabilities and the clipped ratio times the advantage. PPO
-is now a dominant algorithm in the field of reinforcement learning used with models such as ChatGPT \cite{openai_2022}.
+Reinforcement Learning (RL) is a field that has been dominated by several approaches. One of the most notable is the Advantage Actor Critic (A2C) model \cite{mnih2016asynchronous}, which uses two networks for the actor and critic. These models are used to estimate an optimal policy and value function, respectively. The advantage function is calculated on a prediction and is used to compute the loss.
 
-Transformers have also been experimented with in the field of Reinforcement Learning. One work named Decision Transformer has applied an autoregressive language model named GPT2 to take a series of
-time steps, states, actions, and rewards-to-go and predict the next action \cite{radford2019language,chen2021decision}. The flexibility of using transformers is provided by Huggingface Transformers
-which provides an easy API to use state-of-the-art transformer models \cite{wolf2019huggingface}.
-In this work, we combine the PPO algorithm and the Decision Transformer.
+Proximal Policy Optimization (PPO) \cite{schulman2017proximal} builds upon A2C and uses a similar architecture. It implements clip loss for the actor loss, which takes the minimum of the ratio of new and old log probabilities, and the clipped ratio times the advantage. PPO is now a widely used algorithm in RL and is often used with models like ChatGPT \cite{openai_2022}.
 
-% A2C citation - \cite{mnih2016asynchronous}
-% PPO citation - \cite{schulman2017proximal}
-% Decision Transformer citation - \cite{chen2021decision}
-% GPT2 citation - \cite{radford2019language}
-% Wandb citation - \cite{wandb}
-% Hugging face transformers citation - \cite{wolf2019huggingface}
+Transformers have also been explored in the field of RL. One example is Decision Transformer, which uses an autoregressive language model (GPT2) to take a series of time steps, states, actions, and rewards-to-go and predict the next action \cite{radford2019language,chen2021decision}. The flexibility of using transformers is made possible by Huggingface Transformers \cite{wolf2019huggingface}, which provides an easy-to-use API for state-of-the-art transformer models. In this work, we combine the PPO algorithm and the Decision Transformer.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -228,8 +132,6 @@ In this work, we combine the PPO algorithm and the Decision Transformer.
 %If you are examining different options describe them all. Feel free to add diagrams to
 %clarify.
 \section{Background}
-% \label{sec:background}
-
 All of the environments used in this project are from the OpenAI Gym library\cite{brockman2016openai}. The environments are described below.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% \cite{wolf2019huggingface}
@@ -287,7 +189,6 @@ Overall, the BipedalWalker environment presents a more challenging control task 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Methodology}
-\label{sec:methodology}
 
 Our agents implement the Proximal Policy Optimization (PPO) algorithm to learn the optimal policy for each environment. PPO is a popular policy gradient method that uses a clipped surrogate objective function to improve the policy.
 
@@ -305,12 +206,6 @@ To prevent the actor network from overfitting, we use a simpler feed-forward net
 %sure to describe them all. Feel free to add diagrams and equations to clarify.
 
 \subsection{Reinforcement Learning Methods}
-\label{subsec:reinf-learning-methods}
-% PPO, Transformers, GPT
-
-% It will then feed the states and actions through linear layers to create state and action embeddings, and feed the 
-% timesteps through an embedding layer which generates positional embeddings. It adds the positional embeddings to the state and action embeddings. 
-% Then 
 
 In this project, we use the Proximal Policy Optimization (PPO) algorithm \cite{schulman2017proximal} to find the optimal policies for agents to follow in unknown environments. PPO is a state-of-the-art reinforcement learning algorithm that is both effective and efficient. It works by using a policy to determine the actions that an agent should take in a given state, and then using a value function to evaluate the potential outcomes of those actions. The algorithm then uses this information to adjust the policy in a way that maximizes the expected reward for the agent.
 
@@ -374,7 +269,7 @@ For the \textbf{main\_train.py} file we have the following additional command li
     \item \texttt{-e} or \texttt{--env} - The Open AI Gym environment [Default: LunarLander-v2]
     \item \texttt{-m} or \texttt{--model\_name} - The name of the model to train [Default: ppo\_ex (PPO)]
     \item \texttt{-ne} or \texttt{--num\_epochs} - The number of epochs to train for [Default: 150]
-    \item \texttt{--al\_check\_interval} - The itervale of epochs to run validation [Default: 5]
+    \item \texttt{--al\_check\_interval} - The interval of epochs to run validation [Default: 5]
     \item \texttt{--wandb\_project} - The wandb project to log to [Default: rl\_project]
     \item \texttt{--wandb\_entity} - The wandb entity to log to [Default: ece517]
     \item \texttt{--seed} - The seed value for training [Default: 123]
@@ -407,15 +302,16 @@ It simply loads in the correct model and trains or tests it.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Models}
 
-The baseline PPO model we use to compare against our results is in the \textbf{rllib/examples/PPOExample.py} file. In it contains code taken from the Lighting-Bolts library with no modifications. We store this model locally to protect against any future api changes in the library. The file contains a class named PPO that inherits from the LightningModule class. Our implementation is built upon this class.
 
-This work's implementation resides at \textbf{rllib/GPT2PPO.py}. This file contains the GPT2PPO class which implements the same interface as the reference PPO. Apart from the existing MLP, ActorContinuous, and ActorCategorical models used in the baseline PPO implementation that are given by the Lighting-Bolts library, we use 2 additonal models that are impelmented in the \textbf{rllib/CommonBase.py} file and the \textbf{rllib/CommonGPT2.py} file.
+In this work, we use the \textit{Proximal Policy Optimization (PPO)} algorithm to learn the optimal policies for agents in unknown environments. The baseline PPO model we use to compare against our results is in the \textit{rllib/examples/PPOExample.py} file. It contains code from the Lighting-Bolts library with no modifications. We store this model locally to protect against any future API changes in the library. The file contains a class named PPO that inherits from the LightningModule class. Our implementation is built upon this class.
 
-The \textbf{rllib/CommonBase.py} file implements the CommonBase class. This class implements a simple Sequential model containing a Linear layer with a relu activation function followed by a Linear layer with no activation function. This class is used as the the base of the ActorCategorical and ActorContinuous models. States are fed through this and immediately given to the actor.
+Our implementation is in the \textit{rllib/GPT2PPO.py} file. This file contains the \textit{GPT2PPO} class which implements the same interface as the reference PPO. In addition to the MLP, ActorContinuous, and ActorCategorical models used in the baseline PPO implementation from the Lighting-Bolts library, we use two additional models implemented in the \textit{rllib/CommonBase.py} and \textit{rllib/CommonGPT2.py} files.
 
-The \textbf{rllib/CommonGPT2.py} file implements the CommonGPT2 class. This class implements a usage of the GPT2 model which is stored in the \textbf{rllib/GPT2.py} file. The GPT2 model is taken from the Decision Transformer implementation\cite{chen2021decision}. In that work the authors took the huggingface GPT2 model and removed the logic that implment positional embeddings\cite{radford2019language,wolf2019huggingface}. Our CommonGPT2 shares large similarities with the Decision Transformer implementation\cite{chen2021decision}; however, we chose to only feed the states and actions to GPT2 rather than the states, actions, and rewards to go. As input, CommonGPT2 will take a history of timesteps, states, and actions as input of shape (batch\_size, sequence\_length,:). It will then return an embedding of the state and action. The embedding of the state is then fed to the critic and the critic predicts the value of the state.
+The \textit{rllib/CommonBase.py} file implements the \textit{CommonBase} class. This class implements a simple Sequential model containing a Linear layer with a ReLU activation function followed by a Linear layer with no activation function. This class is used as the base of the ActorCategorical and ActorContinuous models. States are fed through this and immediately given to the actor.
 
-GPT2PPO has some differences from the baseline PPO in how the internals are structured. Because we are using a transformer, we need to keep track of the history of the states, actions, timesteps, and attention masks used by the model. We do this by storing each of the respective histories in a buffer of a length equal to the context length of the GPT2 model. When the buffer is full, the oldest entry is removed and the new entry is added to the end of the buffer. The buffer is then fed to the GPT2 model, and the most current state is fed through the CommonBase then the actor. The GPT2 model will then return an embedding of the state and action. The embedding of the state is given to the critic. All inputs are saved in a history array which is later used for training.
+The \textbf{rllib/CommonGPT2.py} file implements the CommonGPT2 class. This class implements a usage of the GPT2 model which is stored in the \textbf{rllib/GPT2.py} file. The GPT2 model is taken from the Decision Transformer implementation\cite{chen2021decision}. In that work, the authors took the HuggingFace GPT2 model and removed the logic that implment positional embeddings\cite{radford2019language,wolf2019huggingface}. Our CommonGPT2 shares large similarities with the Decision Transformer implementation\cite{chen2021decision}; however, we chose to only feed the states and actions to GPT2 rather than the states, actions, and rewards to go. As input, CommonGPT2 will take a history of timesteps, states, and actions as input of shape (batch\_size, sequence\_length,:). It will then return an embedding of the state and action. The embedding of the state is then fed to the critic and the critic predicts the value of the state.
+
+GPT2PPO has some differences from the baseline PPO in how the internals are structured. Because we are using a transformer, we need to keep track of the history of the states, actions, timesteps, and attention masks used by the model. We do this by storing each of the respective histories in a buffer of a length equal to the context length of the GPT2 model. When the buffer is full, the oldest entry is removed, and the new entry is added to the end of the buffer. The buffer is then fed to the GPT2 model, and the most current state is fed through the CommonBase and then the actor. The GPT2 model will then return an embedding of the state and action. The embedding of the state is given to the critic. All inputs are saved in a history array which is later used for training.
 
 There are two main functions for data generation and training. The \textbf{generate\_trajectory\_samples} function is used to generate data for training. It runs a configured number of timesteps then yields the model inputs, attention masks, actions, log probabilities, Q values, and Advantages for all timesteps. The \textbf{training\_step} function takes a batch of data and calculates and returns the loss for the actor or critic. This loss is used by the Pytorch-Lightning framework to update the actor or critic.
 
@@ -434,12 +330,7 @@ There are two main functions for data generation and training. The \textbf{gener
 \section{Results}
 \label{sec:results}
 
-In this work, we compare the results of our GPT2PPO model against the baseline PPO model.
-We compare the results of both models on the Lunar Lander, Acrobot, and environments.
-To keep all of our results consistent, when comparing models, we ran each model with the
-same hyperparameters for the same number of epochs.
-The hyperparameters for both models are listed in Table \ref{tab:hyperparameters}.
-We ran each model 3 times and averaged the results.
+In this work, we compare the results of our GPT2PPO model against the baseline PPO model. We compare the results of both models on the Lunar Lander, Acrobot, and environments. To keep all of our results consistent, when comparing models, we ran each model with the same hyperparameters for the same number of epochs. The hyperparameters for both models are listed in Table \ref{tab:hyperparameters}. We ran each model 3 times and averaged the results.
 
 \begin{table}[htbp]
     \caption{Model Hyperparameters}
@@ -477,25 +368,16 @@ We ran each model 3 times and averaged the results.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Lunar Lander}
 
-Lunar Lander is a simple environment that we assume will be easy for both models to learn.
-We do not believe recurrence or attention will offer any superior advantage to base PPO in this environment.
-As described above, we trained both PPO and GPT2PPO for 150 epochs three times and averaged the results.
-Through our experiments, we found the models to be comparable in performance.
+Lunar Lander is a simple environment that we assume will be easy for both models to learn. We do not believe recurrence or attention will offer any superior advantage to base PPO in this environment. As described above, we trained both PPO and GPT2PPO for 150 epochs three times and averaged the results. Through our experiments, we found the models to be comparable in performance.
 
-Figure \ref{lunar-lander-loss_critic-model} shows the critic loss for both models. It can be seen that the GPT2PPO model critic learns
-slower than the Baseline PPO model. This is likely due to the fact that the GPT2PPO model has far more weights to train, and the input to the model
-is much larger. However, the GPT2PPO critic does learn and eventually converges to a similar critic loss as the baseline PPO model.
-Figure \ref{lunar-lander-loss_actor-model} shows the actor loss for both models. It can be seen that the loss for both models is very similar.
-This is likely because the actor in both models is very similar. The only difference is that the actor has two additional layers.
-Figure \ref{lunar-lander-avg_ep_reward-model} shows the average episode reward for both models. On average, the GPT2PPO model gains increases in average
-episode rewards at a similar pace as the Baseline PPO. However, the GPT2PPO model does not reach the same average reward as the Baseline PPO model, rather,
-it converges upon a slightly lower episode reward.
-Figure \ref{lunar-lander-avg_ep_len-model} shows the average episode length for both models. On average, the GPT2PPO model gains increases in average
-episode length slower than the Baseline PPO. Additionally, the GPT2PPO model does not reach the same average episode length as the Baseline PPO model.
-The GPT2PPO model seems to learn up to a certain point but fails to converge upon an optimal policy. This could be because we needed to train the model
-for more epochs
-Overall, the GPT2PPO model performs similarly to the baseline PPO model. However, the GPT2PPO model converges to slightly worse values as compared to the
-Baseline PPO model.
+Figure \ref{lunar-lander-loss_critic-model} shows the critic loss for both models. It can be seen that the GPT2PPO model critic learns slower than the Baseline PPO model. This is likely due to the fact that the GPT2PPO model has far more weights to train, and the input to the model is much larger. However, the GPT2PPO critic does learn and eventually converges to a similar critic loss as the baseline PPO model.
+
+Figure \ref{lunar-lander-loss_actor-model} shows the actor loss for both models. It can be seen that the loss for both models is very similar. This is likely because the actor in both models is very similar. The only difference is that the actor has two additional layers.
+
+Figure \ref{lunar-lander-avg_ep_reward-model} shows the average episode reward for both models. On average, the GPT2PPO model gains increases in average episode rewards at a similar pace as the Baseline PPO. However, the GPT2PPO model does not reach the same average reward as the Baseline PPO model; instead, it converges upon a slightly lower episode reward.
+
+Figure \ref{lunar-lander-avg_ep_len-model} shows the average episode length for both models. On average, the GPT2PPO model gains increases in average episode length slower than the Baseline PPO. Additionally, the GPT2PPO model does not reach the same average episode length as the Baseline PPO model. The GPT2PPO model seems to learn up to a certain point but fails to converge upon an optimal policy. This could be because we needed to train the model for more epochs
+Overall, the GPT2PPO model performs similarly to the baseline PPO model. However, the GPT2PPO model converges to slightly worse values as compared to the Baseline PPO model.
 
 %% PPO vs GPT2PPO - Comparison
 \begin{figure}[htbp]
@@ -520,11 +402,8 @@ Baseline PPO model.
 \end{figure}
 
 
-We also experimented with different context lengths for the GPT2PPO model for the Lunar Lander environment.
-We kept the same hyperparameters shown in Table \ref{tab:hyperparameters}, but altered the context length to be 25, 50, and 75.
-Figures \ref{lunar-lander-loss_critic-ctx_len}, \ref{lunar-lander-loss_actor-ctx_len}, \ref{lunar-lander-avg_ep_reward-ctx_len}, and
-\ref{lunar-lander-avg_ep_len-ctx_len} show these results. It can be seen that all context lengths perform similarly. This is likely because
-of the structure of the environment.
+We also experimented with different context lengths for the GPT2PPO model for the Lunar Lander environment. We kept the same hyperparameters shown in Table \ref{tab:hyperparameters}, but altered the context length to be 25, 50, and 75.
+Figures \ref{lunar-lander-loss_critic-ctx_len}, \ref{lunar-lander-loss_actor-ctx_len}, \ref{lunar-lander-avg_ep_reward-ctx_len}, and \ref{lunar-lander-avg_ep_len-ctx_len} show these results. We can see that all context lengths perform similarly. This is likely because of the structure of the environment.
 
 %% GPT2PPO - Different Context Lengths
 % Context lengths of [25,50,75]
@@ -554,21 +433,11 @@ of the structure of the environment.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Acrobot}
-The Acrobot environment is slightly more complex than the Lunar Lander environment. We stipulate that
-some sense of recurrence or attention would be beneficial as the agent should likely take into account its previous
-states and actions when making a decision to conserve its momentum.
-Through our experiments, we find that the GPT2PPO model tends to learn faster than the Baseline PPO model, but tends to converge to
-poorer values. Additionally, we found that our model is hugely dependent on starting conditions of the GPT2 model.
+The Acrobot environment is slightly more complex than the Lunar Lander environment. We stipulate that some sense of recurrence or attention would be beneficial as the agent should likely take into account its previous states and actions when making a decision to conserve its momentum. Through our experiments, we find that the GPT2PPO model tends to learn faster than the Baseline PPO model but tends to converge to poorer values. Additionally, we found that our model is hugely dependent on starting conditions of the GPT2 model.
 
-Figure \ref{acrobot-loss_critic-model} shows the critic loss for both models.
-We can see that the GPT2PPO model learns faster on average than the Baseline PPO model, but after 90 epochs, it will diverge to a worse value.
-Figure \ref{acrobot-loss_actor-model} shows the actor loss for both models. The average results are similar between each model. Our model seems
-to have a higher variance as compared to the Baseline PPO model.
-Figure \ref{acrobot-avg_ep_reward-model} shows the average episode reward for both models. The shaded regions show the minimum and maximum
-values for each model across the three runs. Here we can see that the results for our model vary. Our model's minimum average episode reward
-stays equal to the maximum episode length of 500. It does not seem to improve until the 90th epoch, where it quickly improves toward the results of
-other runs. On the other side of the spectrum, the maximum average episode reward learns much quicker than the Baseline PPO model. Moreover, our model,
-on average, will learn at a similar pace to the Baseline PPO model but will converge to a worse value.
+Figure \ref{acrobot-loss_critic-model} shows the critic loss for both models. We can see that the GPT2PPO model learns faster on average than the Baseline PPO model, but after 90 epochs, it will diverge to a worse value. Figure \ref{acrobot-loss_actor-model} shows the actor loss for both models. The average results are similar between each model. Our model seems to have a higher variance as compared to the Baseline PPO model.
+
+Figure \ref{acrobot-avg_ep_reward-model} shows the average episode reward for both models. The shaded regions show the minimum and maximum values for each model across the three runs. Here we can see that the results for our model vary. Our model's minimum average episode reward stays equal to the maximum episode length of 500. It does not seem to improve until the 90th epoch, where it quickly improves toward the results of other runs. On the other side of the spectrum, the maximum average episode reward learns much quicker than the Baseline PPO model. Moreover, our model, on average, will learn at a similar pace to the Baseline PPO model but will converge to a worse value.
 
 %% PPO vs GPT2PPO - Comparison
 \begin{figure}[htbp]
@@ -597,16 +466,9 @@ on average, will learn at a similar pace to the Baseline PPO model but will conv
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Bipedal Walker}
-The Bipedal Walker represents the most complex environment we have trained our model on. This is because the state space is large, and
-the action space is continuous. We hypothesize that the configuration of our model used to compare against the Baseline PPO is
-insufficient to learn the environment. To learn better, we would need to increase the size of the GPT2 model and the number of epochs.
+The Bipedal Walker represents the most complex environment we have trained our model on. This is because the state space is large, and the action space is continuous. We hypothesize that the configuration of our model used to compare against the Baseline PPO is insufficient to learn the environment. To learn better, we would need to increase the size of the GPT2 model and the number of epochs.
 
-Figure \ref{bipedal-walker-loss_critic-model} shows the critic loss for both models. We can see that the converged GPT2PPO critic loss is higher
-than the Baseline PPOs by a factor of 10. This consistent with Figure \ref{bipedal-walker-loss_actor-model}, where the GPT2PPO actor loss is a factor of 1000
-higher than the converged Baseline PPO actor loss.
-Figure \ref{bipedal-walker-avg_ep_reward-model} shows the average episode reward for both models. Similar to the Acrobot environment,
-the results of our model significantly vary. Our model seems to quickly jump around between both good and bad policies, whereas the Baseline PPO model
-converges in a much smoother fashion.
+Figure \ref{bipedal-walker-loss_critic-model} shows the critic loss for both models. We can see that the converged GPT2PPO critic loss is higher than the Baseline PPOs by a factor of 10. This is consistent with Figure \ref{bipedal-walker-loss_actor-model}, where the GPT2PPO actor loss is a factor of 1000 higher than the converged Baseline PPO actor loss. Figure \ref{bipedal-walker-avg_ep_reward-model} shows the average episode reward for both models. Similar to the Acrobot environment, the results of our model significantly vary. Our model quickly switches between good and bad policies, whereas the Baseline PPO model converges much more smoothly.
 Overall, the Baseline PPO model significantly outperforms our model in this environment.
 
 \begin{figure}[htbp]
@@ -640,25 +502,13 @@ Overall, the Baseline PPO model significantly outperforms our model in this envi
 
 \section{Conclusion}
 \label{sec:conclusion}
-% what have we achieved
-% model failures and successes
-% model improvements
-% what have we learned
 
-In this work, we have proposed an addition to the Proximal Policy Optimization (PPO) algorithm used in reinforcement learning named GPT2PPO.
-This addition includes adding to both the actor and critic networks. Specifically, adding two layers to the actor network, and
-adding an autoregressive model (GPT2) to the base of the critic network. We have shown that in simple environments, our model performs similarly to
-the basic PPO implementation, but ultimately converges to a slightly poorer outcome. We have shown that our model can learn when given more complex
-environments; however, more model finetuning and training is required for this method to be effective in those environments.
-We have found that when using a shared network layer for both the actor and critic, the critic loss tends to converge faster than the Baseline PPO, but the actor loss
-diverges after a small number of epochs
-If given more time,
-we would like to validate the correctness of the model's inputs and outputs. We would also like to finetune our model or possibly use pre-trained
-GPT2 weights on these environments to determine how well our model could perform. Finally, we would like to train and experiment on more environments
-to determine how viable our approach is.
-In this project, we have learned how the inner workings of PPO work. We have also learned that applying attention in the form of transformers can work
-if done correctly; we have shown that this approach works in simple environments, but in order to succeed when given more complex problems, there is more
-work and experimentation needed to optimize the architecture of our networks.
+
+In this work, we propose an addition to the Proximal Policy Optimization (PPO) algorithm used in reinforcement learning, named GPT2PPO. This addition includes adding two layers to the actor network and an autoregressive model (GPT2) to the base of the critic network. We show that in simple environments, our model performs similarly to the basic PPO implementation but ultimately converges to a slightly poorer outcome. We also show that our model can learn in more complex environments, but additional model finetuning and training are needed to be effective in those environments.
+
+When using a shared network layer for both the actor and critic, we find that the critic loss converges faster than the Baseline PPO, but the actor loss diverges after a small number of epochs. If given more time, we would like to validate the correctness of the model's inputs and outputs, finetune our model, and experiment on more environments to determine the viability of our approach.
+
+Overall, we have learned about the inner workings of PPO and that applying attention in the form of transformers can be effective when done correctly. However, more work is needed to optimize our network architecture for complex environments.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -672,13 +522,14 @@ work and experimentation needed to optimize the architecture of our networks.
 % An appendix describing which part of the project each team member was in charge of.
 \appendix
 \subsection{Team Member Contributions}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \textbf{Andrei Cozma}. text here.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\textbf{Hunter Price}. Implem
+\textbf{Hunter Price} contributed a working modification of the Decision Transformer that used only the time steps, states, and actions. He utilized Andrei's modification of PPO that stored a buffer of the past timesteps, states, and actions to feed to the CommonGPT2 model. He then modified this code to use consistent matrix shapes. He also added the ability for GPT2PPO to support continuous action spaces. He worked with Andrei to set up the training and testing framework in PyTorch. He found the baseline A2C and PPO implementation in the Lighting-Bolt library. He worked with Andrei to run many experiments used and shown in the report. He wrote code to visualize the results outside of WandB and save them locally. Worked with Andrei to write the report. Additionally, He ran many experiments with different versions of PPO, such as using VGG16 as a base for both the actor and critic when working with environments that gave image data as the state and a model that used a shared encoder with both the actor and critic networks.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
