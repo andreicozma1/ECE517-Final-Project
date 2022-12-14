@@ -42,6 +42,20 @@ class PPO1(LightningModule):
             hidden_size: int = 64,
             **kwargs: Any,
     ) -> None:
+        """
+        Args:
+            env: gym environment tag
+            gamma: discount factor
+            lam: advantage discount factor (lambda in the paper)
+            lr_actor: learning rate of actor network
+            lr_critic: learning rate of critic network
+            max_episode_len: maximum number interactions (actions) in an episode
+            batch_size:  batch_size when training network- can simulate number of policy updates performed per epoch
+            steps_per_epoch: how many action-state pairs to rollout for trajectory collection per epoch
+            nb_optim_iters: how many steps of gradient descent to perform on each batch
+            clip_ratio: hyperparameter for clipping in the policy objective
+            ctx_len:
+        """
         super().__init__()
 
         if not _GYM_AVAILABLE:  # pragma: no cover
