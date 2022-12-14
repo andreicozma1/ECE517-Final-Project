@@ -22,7 +22,6 @@ class CommonTransformer(nn.Module):
         self.emb_p = nn.Embedding(max_episode_len + 1, hidden_size)
         self.emb_s = nn.Linear(n_states, hidden_size)
         self.emb_a = nn.Linear(n_actions, hidden_size)
-        self.emb_r = nn.Linear(n_actions, hidden_size)
 
         self.transformer_encoder = nn.TransformerEncoderLayer(d_model=hidden_size,
                                                               nhead=hidden_size // 8,
@@ -48,35 +47,37 @@ class CommonTransformer(nn.Module):
         return (matrix == pad_token)
 
     def forward(self, input_x, batched=False):
+        """
+        gets inputs and feeds it through the transformer after creating an attention mask
+        :return: returns the embeddings returned by the transformer
+        """
         positions, states, actions = input_x
         positions = positions + 1
-
         pad_mask = self.create_pad_mask(positions, pad_token=0)
-
+        # Embeddings for position, state, and action
         t_emb = self.emb_p(positions)
         s_emb = self.emb_s(states)
         a_emb = self.emb_a(actions)
-
+        # Add positional embeddings to state and action embeddings
         s_emb = s_emb + t_emb
         a_emb = a_emb + t_emb
-
+        # Reshape padding mask and state/action embeddings to match transformer input shape
         pad_mask = pad_mask.reshape(-1, self.seq_len, 1)
         s_emb = s_emb.reshape(-1, self.seq_len, self.hidden_size)
         a_emb = a_emb.reshape(-1, self.seq_len, self.hidden_size)
-
+        # Interleave state and action embeddings
         trans_src = torch.stack([s_emb, a_emb], dim=-1).permute(0, 1, 3, 2)
         trans_src = trans_src.reshape(-1, 2 * self.seq_len, self.hidden_size).squeeze()
         pad_mask = torch.stack([pad_mask, pad_mask], dim=-1).permute(0, 1, 3, 2)
         pad_mask = pad_mask.reshape(-1, 2 * self.seq_len, 1).squeeze()
-
+        # Masked transformer
         trans_out = self.transformer(trans_src, src_key_padding_mask=pad_mask)
-
+        # Simple 1D convolution on the transformer output (reducing time dimension to 1)
         conv_inp = trans_out
         conv_out = self.conv(conv_inp)
-
+        # Output layer
         fc_imp = conv_out.squeeze()
         fc_out = self.fc(fc_imp)
-
         if batched:
             out_shape_expected = torch.Size([self.batch_size, self.out_features])
         else:

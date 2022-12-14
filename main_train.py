@@ -7,6 +7,10 @@ os.environ['WANDB_SILENT'] = "true"
 
 
 def main():
+    """
+    trains model with specified params
+    """
+    # get command line args
     args = parse_args()
     env = args.env
     model_name = args.model_name
@@ -16,9 +20,12 @@ def main():
     val_check_interval = args.val_check_interval
     seed = args.seed
 
+    # creates the model and sets up logging
     m = Model(seed=seed)
     m.create_model(env, model_name)
     m.create_wandb_logger(wandb_proj, wandb_entity)
+
+    # trains the model
     m.train(num_epochs, val_check_interval)
 
 

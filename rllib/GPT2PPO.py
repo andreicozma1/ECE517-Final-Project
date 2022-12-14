@@ -1,26 +1,22 @@
 """
 Taken from https://github.com/Lightning-AI/lightning-bolts/blob/master/pl_bolts/models/rl/ppo_model.py
 """
-import argparse
 import os
 from typing import Any, List, Tuple
 
-import numpy as np
 import torch
-from pytorch_lightning import LightningModule, Trainer, seed_everything
+from pl_bolts.datamodules import ExperienceSourceDataset
+from pl_bolts.models.rl.common.networks import ActorCategorical, ActorContinous, MLP
+from pl_bolts.utils import _GYM_AVAILABLE
+from pl_bolts.utils.warnings import warn_missing_pkg
+from pytorch_lightning import LightningModule
 from torch import Tensor
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from pl_bolts.datamodules import ExperienceSourceDataset
-from pl_bolts.models.rl.common.networks import MLP, ActorCategorical, ActorContinous
-from pl_bolts.utils import _GYM_AVAILABLE
-from pl_bolts.utils.stability import under_review
-from pl_bolts.utils.warnings import warn_missing_pkg
-
 from rllib.CommonBase import CommonBase
-from rllib.CommonTransformer import CommonTransformer
 from rllib.CommonGPT2 import CommonGPT2
+
 if _GYM_AVAILABLE:
     import gym
 else:  # pragma: no cover
@@ -81,31 +77,33 @@ class GPT2PPO(LightningModule):
 
         self.env = gym.make(env)
 
-        # common base network
+        # get the action dimensions
         if isinstance(self.env.action_space, gym.spaces.box.Box):
             self.act_dim = self.env.action_space.shape[0]
         elif isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
             self.act_dim = self.env.action_space.n
-        print('#'*100)
-        print(self.act_dim)
+
+        # create the gpt model and the base sequential model
         self.common_net_1 = CommonGPT2(self.env.observation_space.shape[0],
-                                              self.act_dim,
-                                              self.hidden_size,
-                                              max_episode_len,
-                                              batch_size=self.batch_size,
-                                              seq_len=self.ctx_len
-                                              )
+                                       self.act_dim,
+                                       self.hidden_size,
+                                       max_episode_len,
+                                       batch_size=self.batch_size,
+                                       seq_len=self.ctx_len
+                                       )
         self.common_net_2 = CommonBase(self.env.observation_space.shape[0], self.hidden_size)
 
         # value network
         self.critic = MLP((self.hidden_size,), 1)
-        # self.critic = MLP(self.env.observation_space.shape, 1)
+
         # policy network (agent)
         if isinstance(self.env.action_space, gym.spaces.box.Box):
+            # if continuous action space
             act_dim = self.env.action_space.shape[0]
             actor_mlp = MLP((self.hidden_size,), act_dim)
             self.actor = ActorContinous(actor_mlp, act_dim)
         elif isinstance(self.env.action_space, gym.spaces.discrete.Discrete):
+            # if discrete action space
             actor_mlp = MLP((self.hidden_size,), self.env.action_space.n)
             self.actor = ActorCategorical(actor_mlp)
         else:
@@ -114,41 +112,50 @@ class GPT2PPO(LightningModule):
                     f"Got type: {type(self.env.action_space)}"
             )
 
+        # setup arrays to keep track of history
         self.batch_nn_inputs = []
         self.batch_actions = []
         self.batch_adv = []
         self.batch_qvals = []
         self.batch_logp = []
         self.batch_attention_mask = []
-
-
         self.ep_rewards = []
         self.ep_values = []
         self.epoch_rewards = []
-
         self.episode_step = 0
         self.avg_ep_reward = 0
         self.avg_ep_len = 0
         self.avg_reward = 0
-
         self.timesteps = None
         self.states = None
         self.actions = None
         self.reset_all()
 
     def reset_all(self):
-        self.timesteps = torch.ones(self.ctx_len, dtype=torch.long).to(self.device) * -1 # MARK
+        """
+        reset the timestep, states, and action histories at the beginning of an episode
+        :return:
+        """
+        self.timesteps = torch.ones(self.ctx_len, dtype=torch.long).to(self.device) * -1  # MARK
         self.states = torch.zeros(self.ctx_len, *self.env.observation_space.shape, dtype=torch.float32).to(self.device)
         self.add_state(self.env.reset())
         self.actions = torch.zeros(self.ctx_len, self.act_dim, dtype=torch.float32).to(self.device)
 
-
     def forward(self, nn_inputs) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """
+        send the inputs through the actor and critic network
+        :param nn_inputs: timesteps, states, and actions
+        :return: returns action probs, predicted actions, predicted value, and attention maks
+        """
         pi, action, attention_mask = self.forward_actor(nn_inputs, batched=False)
         value, attention_mask = self.forward_critic(nn_inputs, batched=False)
         return pi, action, value, attention_mask
 
     def forward_actor(self, nn_inputs, batched, attention_mask=None):
+        """
+        feeeds inputs through the actor network
+        :return: returns the action probs, predited action
+        """
         _, states, _ = nn_inputs
         states = states.reshape(-1, self.ctx_len, *self.env.observation_space.shape)
         states = states[:, -1, :]
@@ -156,16 +163,27 @@ class GPT2PPO(LightningModule):
         return pi, action, attention_mask
 
     def forward_critic(self, nn_inputs, batched, attention_mask=None):
+        """
+        feeds inputs through the critic network and uses attention mask if there is one
+        :return: predicted value and attention mask
+        """
         _, sa_comm, attention_mask = self.common_net_1(nn_inputs, batched=batched, attention_mask=attention_mask)
         value = self.critic(sa_comm)
         return value, attention_mask
 
     def add_state(self, next_state):
+        """
+        adds a state tot the state buffer
+        """
         next_state = torch.from_numpy(next_state).to(self.device)
         next_state = torch.reshape(next_state, (1, -1))
         self.states = torch.cat((self.states[1:], next_state))
 
     def add_action(self, pi, action):
+        """
+        adds an action ot the actor buffer
+        categorical: adds the log probabilities
+        """
         if isinstance(self.env.action_space, gym.spaces.box.Box):
             self.act_dim = self.env.action_space.shape[0]
             self.actions = torch.cat((self.actions[1:], action.unsqueeze(0)))
@@ -174,17 +192,27 @@ class GPT2PPO(LightningModule):
             self.actions = torch.cat((self.actions[1:], log_probs))
 
     def add_step(self):
+        """
+        adds a timestep to the timestep buffer
+        """
         ep_step = torch.Tensor([self.episode_step]).to(self.device)
         ep_step = ep_step.int()
         self.timesteps = torch.cat((self.timesteps[1:], ep_step))
 
     def eval_start(self):
+        """
+        used to setup the environment for evaluation
+        """
         self.reset_all()
         self.timesteps = self.timesteps.to(self.device)
         self.states = self.states.to(self.device)
         self.actions = self.actions.to(self.device)
 
     def eval_step(self):
+        """
+        used to take a step in evaluation
+        :return: returns the next state, reward, and if it is done or not
+        """
         with torch.no_grad():
             pi, action, _, _ = self((self.timesteps, self.states, self.actions))
             action = torch.squeeze(action)
@@ -196,7 +224,11 @@ class GPT2PPO(LightningModule):
         self.add_state(next_state)
 
         return next_state, reward, done
+
     def eval_stop(self):
+        """
+        closes out the environemnt
+        """
         self.env.close()
 
     def generate_trajectory_samples(self) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
@@ -213,6 +245,7 @@ class GPT2PPO(LightningModule):
 
             self.add_step()
 
+            # feed observations through networks
             with torch.no_grad():
                 ###############################################################################
                 # PPO1:
@@ -230,6 +263,7 @@ class GPT2PPO(LightningModule):
                 # print(action)
                 log_prob = self.actor.get_log_prob(pi, action)
 
+            # save action
             self.add_action(pi, action)
 
             ###############################################################################
@@ -237,23 +271,24 @@ class GPT2PPO(LightningModule):
             # action_for_step.shape: ()
             ###############################################################################
             action_for_step = action.cpu().numpy()
+            # feed predicted action to the environment
             next_state, reward, done, _ = self.env.step(action_for_step)
 
             self.episode_step += 1
 
+            # save run data
             self.batch_nn_inputs.append((self.timesteps, self.states, self.actions))
             self.batch_actions.append(action)
             self.batch_logp.append(log_prob)
             self.batch_attention_mask.append(attention_mask)
-
             self.ep_rewards.append(reward)
             self.ep_values.append(value.item())
-
             self.add_state(next_state)
 
             epoch_end = step == (self.steps_per_epoch - 1)
             terminal = len(self.ep_rewards) == self.max_episode_len
 
+            # if episode has ended calculate qvalues and advantage
             if epoch_end or done or terminal:
                 # if trajectory ends abtruptly, boostrap value of next state
                 if (terminal or epoch_end) and not done:
@@ -279,9 +314,15 @@ class GPT2PPO(LightningModule):
 
                 self.reset_all()
 
+            # if epoch has ended begin yielding to the dataset
             if epoch_end:
                 train_data = zip(
-                        self.batch_nn_inputs, self.batch_attention_mask, self.batch_actions, self.batch_logp, self.batch_qvals, self.batch_adv
+                        self.batch_nn_inputs,
+                        self.batch_attention_mask,
+                        self.batch_actions,
+                        self.batch_logp,
+                        self.batch_qvals,
+                        self.batch_adv
                 )
                 for nn_input, attention_mask, action, logp_old, qval, adv in train_data:
                     yield nn_input, attention_mask, action, logp_old, qval, adv
@@ -444,4 +485,3 @@ class GPT2PPO(LightningModule):
     def train_dataloader(self) -> DataLoader:
         """Get train loader."""
         return self._dataloader()
-

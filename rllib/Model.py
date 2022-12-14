@@ -10,10 +10,10 @@ from lightning import seed_everything
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
+from rllib.GPT2PPO import GPT2PPO
 from rllib.PPO1 import PPO1
 from rllib.PPO2 import PPO2
 from rllib.PPO3 import PPO3
-from rllib.GPT2PPO import GPT2PPO
 from rllib.Utils import discount_rewards
 from rllib.examples.A2CExample import AdvantageActorCritic
 from rllib.examples.PPOExample import PPO
@@ -33,8 +33,16 @@ class Model:
         self.loggers = []
 
     def create_model(self, env, model_name, model_params=None, checkpoint_dir='checkpoints'):
+        """
+        Creates a model based on the model_name and env.
+        This utilizes the corresponding class by it's name and stores it in the class
+        :param env: The OpenAI gym environment to use
+        :param model_name: The name used to identify the model to use
+        :param model_params: Any additional parameters to pass to the model
+        :param checkpoint_dir: The directory to save the model checkpoints
+        """
+
         model_params = model_params or {}
-        # setup model
         models = {
                 "ppo_ex" : PPO,
                 "a2c_ex" : AdvantageActorCritic,
@@ -44,6 +52,7 @@ class Model:
                 "ppo_gpt": GPT2PPO,
         }
         if model_name not in models:
+            # Show all the models that are supported to the user
             print(f"ERROR: Model {model_name} not supported")
             print("Available models:")
             for model in models:
@@ -51,11 +60,17 @@ class Model:
             sys.exit(1)
         self.name = model_name
         self.model = models[self.name](env, *model_params)
+        # Model hash that is used for the run name in WandB
         self.model_hash = str(hashlib.md5(str(self.model).encode('utf-8')).hexdigest())
         self.model_save_dir = os.path.join(checkpoint_dir, self.name, env)
         print(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def load_model(self, checkpoint_path, model_params=None):
+        """
+        Loads a model from a checkpoint
+        :param checkpoint_path: The file path for the checkpoint
+        :param model_params: Any additional parameters to pass to the model
+        """
         model_params = model_params or {}
         model_path_split = checkpoint_path.split('/')
         model_name, env = model_path_split[-3], model_path_split[-2]
@@ -64,6 +79,12 @@ class Model:
         print(f"Args:\n{pprint.pformat(self.__dict__, width=30)}")
 
     def train(self, num_epochs, val_check_interval=None):
+        """
+        Trains the model for a specified number of epochs
+        :param num_epochs: The number of epochs to train for
+        :param val_check_interval: Validation interval passed to the trainer
+        :return:
+        """
         trainer = Trainer(
                 accelerator="auto",
                 devices=1 if torch.cuda.is_available() else None,  # limiting got iPython runs
@@ -77,15 +98,21 @@ class Model:
         )
         if self.model is None:
             raise ValueError("ERROR: Model hasn't been created/loaded")
+        # Fit and save model checkpoint
         trainer.fit(self.model)
         self.save_model()
 
     def eval(self):
+        """
+        Evaluation loop for testing a model
+        """
         if self.model is None:
             raise ValueError("ERROR: Model hasn't been created/loaded")
         done = False
+        # Reset the environment and set initial variables
         state = torch.FloatTensor(self.model.env.reset())
         total_rewards, total_steps = 0, 0
+        # Keep track of predicted values and rewards history
         pred_value = []
         hist_rewards = []
         print(self.name)
@@ -146,6 +173,11 @@ class Model:
         torch.save(self.model.state_dict(), save_path)
 
     def create_wandb_logger(self, wandb_project=None, wandb_entity=None):
+        """
+        Create the WandB logger that is ultimately passed to the trainer
+        :param wandb_project: The project name for WandB
+        :param wandb_entity: The entity name for WandB
+        """
         wandb_project = wandb_project.strip()
         wandb_entity = wandb_entity.strip()
         if self.model_hash is None or self.name is None:
@@ -158,6 +190,10 @@ class Model:
                                             group=self.name, tags=["train"]))
 
     def create_csv_logger(self, log_dir):
+        """
+        Create a CSV logger that is ultimately passed to the trainer
+        :param log_dir: the directory to save the logs
+        """
         log_dir = log_dir.strip()
         if self.model_hash is None:
             raise ValueError("Model hasn't been created/loaded")

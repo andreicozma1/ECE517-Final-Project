@@ -5,18 +5,15 @@ import argparse
 import os
 from typing import Any, List, Tuple
 
-import numpy as np
 import torch
-from pytorch_lightning import LightningModule, Trainer, seed_everything
+from pl_bolts.datamodules import ExperienceSourceDataset
+from pl_bolts.models.rl.common.networks import ActorCategorical, ActorContinous, MLP
+from pl_bolts.utils import _GYM_AVAILABLE
+from pl_bolts.utils.warnings import warn_missing_pkg
+from pytorch_lightning import LightningModule
 from torch import Tensor
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
-
-from pl_bolts.datamodules import ExperienceSourceDataset
-from pl_bolts.models.rl.common.networks import MLP, ActorCategorical, ActorContinous
-from pl_bolts.utils import _GYM_AVAILABLE
-from pl_bolts.utils.stability import under_review
-from pl_bolts.utils.warnings import warn_missing_pkg
 
 from rllib.CommonBase import CommonBase
 from rllib.CommonTransformer import CommonTransformer
@@ -30,26 +27,8 @@ os.environ['WANDB_SILENT'] = "true"
 
 
 class PPO2(LightningModule):
-    """PyTorch Lightning implementation of `Proximal Policy Optimization.
-
-    <https://arxiv.org/abs/1707.06347>`_
-
-    Paper authors: John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov
-
-    Model implemented by:
-        `Sidhant Sundrani <https://github.com/sid-sundrani>`_
-
-    Example:
-        >>> from pl_bolts.models.rl.ppo_model import PPO
-        >>> model = PPO("CartPole-v0")
-
-    Note:
-        This example is based on OpenAI's
-        `PPO <https://github.com/openai/spinningup/blob/master/spinup/algos/pytorch/ppo/ppo.py>`_ and
-        `PPO2 <https://github.com/openai/baselines/blob/master/baselines/ppo2/ppo2.py>`_.
-
-    Note:
-        Currently only supports CPU and single GPU training with ``accelerator=dp``
+    """
+    Modification based on the original PPO example to use a simple transformer encoder for the critic
     """
 
     def __init__(
@@ -157,6 +136,11 @@ class PPO2(LightningModule):
         self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32)
 
     def forward(self, nn_inputs) -> Tuple[Tensor, Tensor, Tensor]:
+        """
+        Forward pass of the network.
+        :param x: input tensor
+        :return: The predicted policy, action, and value
+        """
         pi, action = self.forward_actor(nn_inputs)
         value = self.forward_critic(nn_inputs, batched=False)
         return pi, action, value
@@ -192,11 +176,6 @@ class PPO2(LightningModule):
         self.timesteps = torch.cat((self.timesteps[1:], ep_step))
 
     def generate_trajectory_samples(self) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
-        """Contains the logic for generating trajectory data to train policy and value network.
-
-        Yield:
-           Tuple of Lists containing tensors for states, actions, log probs, qvals and advantage
-        """
 
         for step in range(self.steps_per_epoch):
             self.timesteps = self.timesteps.to(self.device)
@@ -296,16 +275,6 @@ class PPO2(LightningModule):
                 self.epoch_rewards.clear()
 
     def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx, optimizer_idx):
-        """Carries out a single update to actor and critic network from a batch of replay buffer.
-
-        Args:
-            batch: batch of replay buffer/trajectory data
-            batch_idx: not used
-            optimizer_idx: idx that controls optimizing actor or critic network
-
-        Returns:
-            loss
-        """
         nn_inputs, action, old_logp, qval, adv = batch
         ###############################################################################
         # PPO1:
@@ -391,16 +360,6 @@ class PPO2(LightningModule):
         return list(reversed(cumul_reward))
 
     def calc_advantage(self, rewards: List[float], values: List[float], last_value: float) -> List[float]:
-        """Calculate the advantage given rewards, state values, and the last value of episode.
-
-        Args:
-            rewards: list of episode rewards
-            values: list of state values from critic
-            last_value: value of last state of episode
-
-        Returns:
-            list of advantages
-        """
         rews = rewards + [last_value]
         vals = values + [last_value]
         # GAE

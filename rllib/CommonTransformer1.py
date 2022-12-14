@@ -1,9 +1,5 @@
-from typing import Tuple
-
 import torch
-from pl_bolts.models import VAE
 from torch import nn
-from torch import Tensor
 
 
 class CommonTransformer(nn.Module):

@@ -1,4 +1,10 @@
 def discount_rewards(rewards: list, gamma: float) -> list:
+    """
+    Calculates the return
+    :param rewards: array of episode rewards
+    :param gamma: discount factor
+    :return: returns
+    """
     cumul_reward = []
     sum_r = 0.0
     for r in reversed(rewards):

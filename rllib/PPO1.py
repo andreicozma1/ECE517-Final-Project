@@ -5,15 +5,14 @@ import argparse
 from typing import Any, List, Tuple
 
 import torch
-from pytorch_lightning import LightningModule
-from torch.optim.optimizer import Optimizer
-from torch.utils.data import DataLoader
-
 from pl_bolts.datamodules import ExperienceSourceDataset
-from pl_bolts.models.rl.common.networks import MLP, ActorCategorical, ActorContinous
+from pl_bolts.models.rl.common.networks import ActorCategorical, ActorContinous, MLP
 from pl_bolts.utils import _GYM_AVAILABLE
 from pl_bolts.utils.warnings import warn_missing_pkg
+from pytorch_lightning import LightningModule
 from torch import Tensor
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader
 
 from rllib.CommonBase import CommonBase
 
@@ -24,26 +23,8 @@ else:  # pragma: no cover
 
 
 class PPO1(LightningModule):
-    """PyTorch Lightning implementation of `Proximal Policy Optimization.
-
-    <https://arxiv.org/abs/1707.06347>`_
-
-    Paper authors: John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov
-
-    Model implemented by:
-        `Sidhant Sundrani <https://github.com/sid-sundrani>`_
-
-    Example:
-        >>> from pl_bolts.models.rl.ppo_model import PPO
-        >>> model = PPO("CartPole-v0")
-
-    Note:
-        This example is based on OpenAI's
-        `PPO <https://github.com/openai/spinningup/blob/master/spinup/algos/pytorch/ppo/ppo.py>`_ and
-        `PPO2 <https://github.com/openai/baselines/blob/master/baselines/ppo2/ppo2.py>`_.
-
-    Note:
-        Currently only supports CPU and single GPU training with ``accelerator=dp``
+    """
+    Modification based on the original PPO example to use a simple shared FFN for the policy and value functions.
     """
 
     def __init__(
@@ -61,19 +42,6 @@ class PPO1(LightningModule):
             hidden_size: int = 64,
             **kwargs: Any,
     ) -> None:
-        """
-        Args:
-            env: gym environment tag
-            gamma: discount factor
-            lam: advantage discount factor (lambda in the paper)
-            lr_actor: learning rate of actor network
-            lr_critic: learning rate of critic network
-            max_episode_len: maximum number interactions (actions) in an episode
-            batch_size:  batch_size when training network- can simulate number of policy updates performed per epoch
-            steps_per_epoch: how many action-state pairs to rollout for trajectory collection per epoch
-            nb_optim_iters: how many steps of gradient descent to perform on each batch
-            clip_ratio: hyperparameter for clipping in the policy objective
-        """
         super().__init__()
 
         if not _GYM_AVAILABLE:  # pragma: no cover
@@ -132,13 +100,10 @@ class PPO1(LightningModule):
         self.state = torch.FloatTensor(self.env.reset())
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
-        """Passes in a state x through the network and returns the policy and a sampled action.
-
-        Args:
-            x: environment state
-
-        Returns:
-            Tuple of policy and action
+        """
+        Forward pass of the network.
+        :param x: input tensor
+        :return: The predicted policy, action, and value
         """
         x = self.common_net(x)
         pi, action = self.actor(x)
@@ -147,15 +112,6 @@ class PPO1(LightningModule):
         return pi, action, value
 
     def discount_rewards(self, rewards: List[float], discount: float) -> List[float]:
-        """Calculate the discounted rewards of all rewards in list.
-
-        Args:
-            rewards: list of rewards/advantages
-            discount: discount factor
-
-        Returns:
-            list of discounted rewards/advantages
-        """
         assert isinstance(rewards[0], float)
 
         cumul_reward = []
@@ -168,16 +124,6 @@ class PPO1(LightningModule):
         return list(reversed(cumul_reward))
 
     def calc_advantage(self, rewards: List[float], values: List[float], last_value: float) -> List[float]:
-        """Calculate the advantage given rewards, state values, and the last value of episode.
-
-        Args:
-            rewards: list of episode rewards
-            values: list of state values from critic
-            last_value: value of last state of episode
-
-        Returns:
-            list of advantages
-        """
         rews = rewards + [last_value]
         vals = values + [last_value]
         # GAE
@@ -187,11 +133,6 @@ class PPO1(LightningModule):
         return adv
 
     def generate_trajectory_samples(self) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]:
-        """Contains the logic for generating trajectory data to train policy and value network.
-
-        Yield:
-           Tuple of Lists containing tensors for states, actions, log probs, qvals and advantage
-        """
         # print("=" * 80)
         # print("Generating trajectory samples...")
         for step in range(self.steps_per_epoch):
@@ -302,16 +243,6 @@ class PPO1(LightningModule):
         return loss_critic
 
     def training_step(self, batch: Tuple[Tensor, Tensor], batch_idx, optimizer_idx):
-        """Carries out a single update to actor and critic network from a batch of replay buffer.
-
-        Args:
-            batch: batch of replay buffer/trajectory data
-            batch_idx: not used
-            optimizer_idx: idx that controls optimizing actor or critic network
-
-        Returns:
-            loss
-        """
         # print("=" * 80)
         # print("Training step...")
         state, action, old_logp, qval, adv = batch
@@ -395,20 +326,3 @@ class PPO1(LightningModule):
         )
 
         return parser
-
-# def cli_main() -> None:
-#     parent_parser = argparse.ArgumentParser(add_help=False)
-#     parent_parser = Trainer.add_argparse_args(parent_parser)
-#
-#     parser = PPO.add_model_specific_args(parent_parser)
-#     args = parser.parse_args()
-#
-#     model = PPO(**vars(args))
-#
-#     seed_everything(0)
-#     trainer = Trainer.from_argparse_args(args)
-#     trainer.fit(model)
-#
-#
-# if __name__ == "__main__":
-#     cli_main()

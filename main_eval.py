@@ -9,18 +9,26 @@ from rllib.Model import Model
 
 
 def main():
+    """
+    runs the specified checkpoint through an environemnt and renders it
+    :return:
+    """
+    # get command line arguments
     args = parse_args()
     running_rew_len = args.running_rew_len
     num_episodes = args.num_episodes
     checkpoint_path = args.file_path
     seed = args.seed
 
+    # create the model
     m = Model(seed=seed)
 
     running_reward: collections.deque = collections.deque(maxlen=running_rew_len)
     tq_episode_iter = tqdm(range(num_episodes), leave=False, desc="Episode")
     for _ in tq_episode_iter:
+        # load the model in
         m.load_model(checkpoint_path)
+        # runs model through the environemnt for an episode
         metrics = m.eval()
         running_reward.append(metrics['total_reward'])
         metrics.update({

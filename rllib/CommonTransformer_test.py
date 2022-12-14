@@ -1,9 +1,5 @@
-from typing import Tuple
-
 import torch
-from pl_bolts.models import VAE
 from torch import nn
-from torch import Tensor
 from torch.nn import Transformer
 
 
@@ -11,14 +7,14 @@ class CommonTransformer(nn.Module):
     """Simple MLP network."""
 
     def __init__(
-        self,
-        n_states: int,
-        n_actions: int,
-        out_features: int,
-        max_episode_len: int,
-        batch_size: int,
-        seq_len: int,
-        hidden_size: int = 64,
+            self,
+            n_states: int,
+            n_actions: int,
+            out_features: int,
+            max_episode_len: int,
+            batch_size: int,
+            seq_len: int,
+            hidden_size: int = 64,
     ):
         """
         Args:
@@ -40,13 +36,13 @@ class CommonTransformer(nn.Module):
         self.emb_a = nn.Linear(n_actions, hidden_size)
 
         self.transformer_encoder = nn.TransformerEncoderLayer(
-            d_model=hidden_size,
-            nhead=hidden_size // 8,
-            dim_feedforward=2048,
-            dropout=0.1,
-            activation="gelu",
-            batch_first=True,
-            norm_first=True,
+                d_model=hidden_size,
+                nhead=hidden_size // 8,
+                dim_feedforward=2048,
+                dropout=0.1,
+                activation="gelu",
+                batch_first=True,
+                norm_first=True,
         )
         self.transformer = nn.TransformerEncoder(self.transformer_encoder, num_layers=2)
         # self.transformer: Transformer = nn.Transformer(d_model=hidden_size,
@@ -62,9 +58,9 @@ class CommonTransformer(nn.Module):
         self.conv = nn.Conv1d(self.seq_len, 1, 1)
 
         self.fc = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, out_features),
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
+                nn.Linear(hidden_size, out_features),
         )
 
     def create_pad_mask(self, matrix: torch.tensor, pad_token: int) -> torch.tensor:
@@ -163,10 +159,10 @@ class CommonTransformer(nn.Module):
         ######################################
         # This is for transformer encoder only
         trans_out = self.transformer(
-            src=trans_inp,
-            src_key_padding_mask=Transformer.generate_square_subsequent_mask(
-                self.seq_len, device="cuda"
-            ),
+                src=trans_inp,
+                src_key_padding_mask=Transformer.generate_square_subsequent_mask(
+                        self.seq_len, device="cuda"
+                ),
         )
         # print("trans_out.shape", trans_out.shape)
         ###############################################################################

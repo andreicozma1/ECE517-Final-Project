@@ -5,22 +5,17 @@ import argparse
 import os
 from typing import Any, List, Tuple
 
-import numpy as np
 import torch
-from pytorch_lightning import LightningModule, Trainer, seed_everything
+from pl_bolts.datamodules import ExperienceSourceDataset
+from pl_bolts.models.rl.common.networks import ActorCategorical, ActorContinous, MLP
+from pl_bolts.utils import _GYM_AVAILABLE
+from pl_bolts.utils.warnings import warn_missing_pkg
+from pytorch_lightning import LightningModule
 from torch import Tensor
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 
-from pl_bolts.datamodules import ExperienceSourceDataset
-from pl_bolts.models.rl.common.networks import MLP, ActorCategorical, ActorContinous
-from pl_bolts.utils import _GYM_AVAILABLE
-from pl_bolts.utils.stability import under_review
-from pl_bolts.utils.warnings import warn_missing_pkg
-
 from rllib.CommonAC import CommonAC
-from rllib.CommonBase import CommonBase
-from rllib.CommonTransformer import CommonTransformer
 from rllib.CommonGPT2 import CommonGPT2
 
 if _GYM_AVAILABLE:
@@ -32,26 +27,8 @@ os.environ['WANDB_SILENT'] = "true"
 
 
 class PPO3(LightningModule):
-    """PyTorch Lightning implementation of `Proximal Policy Optimization.
-
-    <https://arxiv.org/abs/1707.06347>`_
-
-    Paper authors: John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, Oleg Klimov
-
-    Model implemented by:
-        `Sidhant Sundrani <https://github.com/sid-sundrani>`_
-
-    Example:
-        >>> from pl_bolts.models.rl.ppo_model import PPO
-        >>> model = PPO("CartPole-v0")
-
-    Note:
-        This example is based on OpenAI's
-        `PPO <https://github.com/openai/spinningup/blob/master/spinup/algos/pytorch/ppo/ppo.py>`_ and
-        `PPO2 <https://github.com/openai/baselines/blob/master/baselines/ppo2/ppo2.py>`_.
-
-    Note:
-        Currently only supports CPU and single GPU training with ``accelerator=dp``
+    """
+    Modification based on PPO2 to test out various improvements
     """
 
     def __init__(
@@ -84,6 +61,7 @@ class PPO3(LightningModule):
             steps_per_epoch: how many action-state pairs to rollout for trajectory collection per epoch
             nb_optim_iters: how many steps of gradient descent to perform on each batch
             clip_ratio: hyperparameter for clipping in the policy objective
+            ctx_len:
         """
         super().__init__()
 
@@ -164,6 +142,11 @@ class PPO3(LightningModule):
         self.actions = torch.zeros(self.ctx_len, self.env.action_space.n, dtype=torch.float32).to(self.device)
 
     def forward(self, nn_inputs) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """
+        Forward pass of the network.
+        :param x: input tensor
+        :return: The predicted policy, action, value, and attention mask
+        """
         pi, action, attention_mask = self.forward_actor(nn_inputs, batched=False)
         value, attention_mask = self.forward_critic(nn_inputs, batched=False)
         return pi, action, value, attention_mask
@@ -416,15 +399,6 @@ class PPO3(LightningModule):
         return loss_critic
 
     def discount_rewards(self, rewards: List[float], discount: float) -> List[float]:
-        """Calculate the discounted rewards of all rewards in list.
-
-        Args:
-            rewards: list of rewards/advantages
-            discount: discount factor
-
-        Returns:
-            list of discounted rewards/advantages
-        """
         assert isinstance(rewards[0], float)
 
         cumul_reward = []
@@ -437,16 +411,6 @@ class PPO3(LightningModule):
         return list(reversed(cumul_reward))
 
     def calc_advantage(self, rewards: List[float], values: List[float], last_value: float) -> List[float]:
-        """Calculate the advantage given rewards, state values, and the last value of episode.
-
-        Args:
-            rewards: list of episode rewards
-            values: list of state values from critic
-            last_value: value of last state of episode
-
-        Returns:
-            list of advantages
-        """
         rews = rewards + [last_value]
         vals = values + [last_value]
         # GAE
